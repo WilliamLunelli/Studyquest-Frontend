@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-slate-900 antialiased;
+  background-image:
+    radial-gradient(circle at 10% 5%, rgba(159, 228, 241, 0.45), transparent 34%),
+    radial-gradient(circle at 95% 12%, rgba(151, 79, 201, 0.22), transparent 30%),
+    radial-gradient(circle at 50% 94%, rgba(242, 174, 143, 0.35), transparent 40%),
+    linear-gradient(180deg, #ffffff 0%, #fff9f7 100%);
+}
+
+::selection {
+  background: rgba(151, 79, 201, 0.2);
+  color: #2a1538;
+}
+
+.grid-pattern {
+  background-image: radial-gradient(circle at 1px 1px, rgba(151, 79, 201, 0.18) 1px, transparent 0);
+  background-size: 24px 24px;
+}

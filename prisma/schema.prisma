@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  avatar    String?
+  bio       String?
+  level     Int      @default(1)
+  xp        Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userBadges UserBadge[]
+  sessions   StudySession[]
+}
+
+model StudySession {
+  id        String   @id @default(uuid())
+  studyTime Int      @default(0)
+  questions Int      @default(0)
+  rate      Int
+  createdAt DateTime @default(now())
+
+  subjectId String
+  userId    String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subjectId])
+}
+
+model Badge {
+  id               String   @id @default(uuid())
+  badgeName        String   @unique
+  badgeDescription String?
+  badgeImage       String?
+  rarity           Int
+  createdAt        DateTime @default(now())
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(uuid())
+  earnedAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  badgeId String
+  badge   Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+}
+
+model Subject {
+  id                 String  @id @default(uuid())
+  subjectName        String
+  subjectDescription String?
+
+  areaId String
+  area   Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  sessions StudySession[]
+
+  @@unique([subjectName, areaId])
+  @@index([areaId])
+}
+
+model Area {
+  id              String  @id @default(uuid())
+  areaName        String  @unique
+  areaDescription String?
+
+  subjects Subject[]
+}
