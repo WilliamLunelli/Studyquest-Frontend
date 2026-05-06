@@ -1,103 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth-session";
-
-const SUBJECT_GRADIENTS = [
-  "from-[#ece4d8] via-[#f6efe3] to-[#d8c7ad]",
-  "from-[#d6cec4] via-[#e8ddd1] to-[#bba692]",
-  "from-[#e7dfd0] via-[#f4ecde] to-[#d4c19e]",
-  "from-[#dbd4c9] via-[#ebe1d5] to-[#bca891]",
-];
-
-function normalizeSubjectTitle(title: string) {
-  const displayTitles: Record<string, string> = {
-    Literatura: "Literatura",
-    "Producao de texto": "Produção de texto",
-    "Produção de texto": "Produção de texto",
-    Matematica: "Matemática",
-    Matemática: "Matemática",
-    Historia: "História",
-    História: "História",
-    Geografia: "Geografia",
-    Biologia: "Biologia",
-    Quimica: "Química",
-    Química: "Química",
-  };
-
-  return displayTitles[title] ?? title;
-}
-
-function formatDuration(seconds: number) {
-  const safe = Math.max(0, seconds);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const remainingSeconds = safe % 60;
-
-  return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
-}
-
-function getDateDaysAgo(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date;
-}
-
-function estimateSessionXp(studyTime: number, questions: number, rate: number) {
-  return Math.round(studyTime / 3 + questions * 2 + rate * 10);
-}
+import { extractTokenFromRequest } from "@/lib/jwt-middleware";
+import { buildApiUrl, API_CONFIG } from "@/lib/api-config";
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getSessionUserId(request);
+    // Extract JWT from Authorization header
+    const token = extractTokenFromRequest(request);
 
-    if (!userId) {
+    if (!token) {
       return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
     }
 
-    const weekStart = getDateDaysAgo(7);
-    const previousWeekStart = getDateDaysAgo(14);
+    // Call backend to get records
+    const recordsUrl = buildApiUrl(API_CONFIG.endpoints.records);
+    const recordsResponse = await fetch(recordsUrl, {
+      method: "GET",
+      headers: {
+        ...API_CONFIG.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-    const [user, subjectRows, weeklySessions, previousWeeklySessions, badgeCountRows, topUsers] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          level: true,
-          xp: true,
-        },
-      }),
-      prisma.$queryRaw<
-        Array<{ title: string; areaName: string; durationSeconds: number; sessionsCount: number }>
-      >`SELECT s.subjectName AS title,
-               a.areaName AS areaName,
-               SUM(ss.studyTime) * 60 AS durationSeconds,
-               COUNT(*) AS sessionsCount
-        FROM StudySession ss
-        INNER JOIN Subject s ON s.id = ss.subjectId
-        INNER JOIN Area a ON a.id = s.areaId
-        WHERE ss.userId = ${userId}
-        GROUP BY ss.subjectId, s.subjectName, a.areaName
-        ORDER BY durationSeconds DESC
-        LIMIT 4`,
-      prisma.$queryRaw<Array<{ studyTime: number; questions: number; rate: number }>>`
-        SELECT studyTime, questions, rate
-        FROM StudySession
-        WHERE userId = ${userId} AND createdAt >= ${weekStart}
-      `,
-      prisma.$queryRaw<Array<{ studyTime: number; questions: number; rate: number }>>`
-        SELECT studyTime, questions, rate
-        FROM StudySession
-        WHERE userId = ${userId} AND createdAt >= ${previousWeekStart} AND createdAt < ${weekStart}
-      `,
-      prisma.$queryRaw<Array<{ count: number }>>`
-        SELECT COUNT(*) AS count
-        FROM UserBadge
-        WHERE userId = ${userId}
-      `,
-      prisma.user.findMany({
-        select: {
+    if (recordsResponse.status === 401) {
+      return NextResponse.json({ message: "Token inválido." }, { status: 401 });
+    }
+
+    if (!recordsResponse.ok) {
+      const error = (await recordsResponse.json()) as { message?: string };
+      return NextResponse.json(
+        { message: error.message ?? "Erro ao buscar registros no backend." },
+        { status: recordsResponse.status }
+      );
+    }
+
+    const recordsData = (await recordsResponse.json()) as {
+      sessions: Array<{
+        id: string;
+        userId: string;
+        subjectId: string;
+        studyTime: number;
+        questions: number;
+        rate: number;
+        createdAt: string;
+      }>;
+    };
+
+    // TODO: Process sessions to build dashboard stats
+    // For now, return raw sessions as placeholder
+    return NextResponse.json(
+      {
+        message: "Dashboard data fetched successfully.",
+        sessions: recordsData.sessions,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro interno ao carregar dashboard.";
+    return NextResponse.json({ message }, { status: 500 });
+  }
+}
           id: true,
           username: true,
           level: true,
