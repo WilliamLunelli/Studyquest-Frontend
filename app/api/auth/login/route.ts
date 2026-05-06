@@ -1,7 +1,25 @@
-import { compare } from "bcryptjs";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/session";
+import { API_CONFIG, buildApiUrl } from "@/lib/api-config";
+
+interface BackendLoginResponse {
+  message: string;
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    avatar: string | null;
+    bio: string | null;
+    level: number;
+    xp: number;
+  };
+}
+
+interface BackendErrorResponse {
+  error?: string;
+  message?: string;
+  errors?: Array<{ field: string; message: string }>;
+}
 
 export async function POST(request: Request) {
   try {
@@ -14,44 +32,28 @@ export async function POST(request: Request) {
     const password = body.password?.trim();
 
     if (!email || !password) {
-      return NextResponse.json({ message: "Informe email e senha." }, { status: 400 });
+      return NextResponse.json({ error: "Email ou senha incorretos" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Call backend login endpoint
+    const backendUrl = buildApiUrl(API_CONFIG.endpoints.login);
+    const backendResponse = await fetch(backendUrl, {
+      method: "POST",
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ email, password }),
     });
 
-    if (!user) {
-      return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
+    const backendData = (await backendResponse.json()) as BackendLoginResponse | BackendErrorResponse;
+
+    // Forward backend response status and data
+    if (!backendResponse.ok) {
+      return NextResponse.json(backendData, { status: backendResponse.status });
     }
 
-    const validPassword = await compare(password, user.password);
-
-    if (!validPassword) {
-      return NextResponse.json({ message: "Credenciais invalidas." }, { status: 401 });
-    }
-
-    const response = NextResponse.json({
-      message: "Login realizado com sucesso.",
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        level: user.level,
-        xp: user.xp,
-      },
-    });
-
-    response.cookies.set(SESSION_COOKIE_NAME, createSessionToken(user.id), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: SESSION_MAX_AGE,
-    });
-
-    return response;
-  } catch {
-    return NextResponse.json({ message: "Erro no login." }, { status: 500 });
+    // Success: return token and user for client to store
+    return NextResponse.json(backendData, { status: 200 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao conectar com backend.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
