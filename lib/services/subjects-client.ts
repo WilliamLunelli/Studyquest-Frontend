@@ -1,18 +1,13 @@
 import { type SubjectCardData } from "@/lib/constants";
-import {
-  buildTempSubject,
-  normalizeSubjectMeta,
-  readTempSubjects,
-  writeTempSubjects,
-} from "@/lib/frontend/subjects";
+import { normalizeSubjectMeta } from "@/lib/frontend/subjects";
 
 type SubjectsApiResponse = {
-  subjects?: SubjectCardData[];
+  subjects?: Array<{ subjectId: string; totalTime: number }>;
   message?: string;
 };
 
 type SubjectsClientResult =
-  | { status: "ok"; subjects: SubjectCardData[] }
+  | { status: "ok"; subjects: Array<{ subjectId: string; totalTime: number }> }
   | { status: "unauthorized" }
   | { status: "error"; message: string };
 
@@ -35,12 +30,9 @@ export async function fetchSubjectsClient(): Promise<SubjectsClientResult> {
       };
     }
 
-    const apiSubjects = (payload.subjects ?? []).map(normalizeSubjectMeta);
-    const tempSubjects = readTempSubjects().map(normalizeSubjectMeta);
-
     return {
       status: "ok",
-      subjects: [...apiSubjects, ...tempSubjects],
+      subjects: payload.subjects ?? [],
     };
   } catch {
     return {
@@ -48,16 +40,4 @@ export async function fetchSubjectsClient(): Promise<SubjectsClientResult> {
       message: "Erro ao carregar matérias. Tente novamente.",
     };
   }
-}
-
-export function createTempSubjectClient(input: {
-  subjectName: string;
-  areaName: string;
-}): SubjectCardData {
-  const newSubject = buildTempSubject(input);
-  const nextSubjects = [newSubject, ...readTempSubjects().map(normalizeSubjectMeta)];
-
-  writeTempSubjects(nextSubjects);
-
-  return newSubject;
 }

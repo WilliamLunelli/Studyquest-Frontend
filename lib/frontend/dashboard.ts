@@ -118,11 +118,10 @@ function pickSubjectObjective(subjectName: string, userSeed: string, salt: numbe
 
 export function mapDashboardPayload(
   payload: DashboardPayload,
-  tempSubjects: SubjectCardData[],
 ): DashboardPayload {
   return {
     ...payload,
-    pendingSubjects: [...payload.pendingSubjects.map(normalizeSubjectMeta), ...tempSubjects.map(normalizeSubjectMeta)],
+    pendingSubjects: payload.pendingSubjects.map(normalizeSubjectMeta),
   };
 }
 

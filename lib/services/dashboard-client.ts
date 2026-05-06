@@ -1,5 +1,4 @@
 import { type DashboardPayload, mapDashboardPayload } from "@/lib/frontend/dashboard";
-import { readTempSubjects } from "@/lib/frontend/subjects";
 
 type DashboardApiError = { message: string };
 
@@ -25,7 +24,7 @@ export async function fetchDashboardClient(): Promise<DashboardClientResult> {
       return { status: "error", message };
     }
 
-    const mapped = mapDashboardPayload(payload as DashboardPayload, readTempSubjects());
+    const mapped = mapDashboardPayload(payload as DashboardPayload);
     return { status: "ok", data: mapped };
   } catch {
     return { status: "error", message: "Erro ao carregar dashboard. Tente novamente." };

@@ -1,7 +1,5 @@
 import { type SubjectCardData } from "@/lib/constants";
 
-export const tempSubjectsStorageKey = "studyquest-temp-subjects";
-
 export type SubjectAreaFilter = "Todas" | "Humanas" | "Exatas";
 
 const subjectTitleAliases: Record<string, string> = {
@@ -65,39 +63,6 @@ export function matchesSubjectFilter(areaName: string | undefined, filter: Subje
 
   return areaName === filter;
 }
-
-export function buildTempSubject(input: {
-  subjectName: string;
-  areaName: string;
-}): SubjectCardData {
-  return {
-    title: normalizeSubjectTitle(input.subjectName.trim()),
-    areaName: input.areaName,
-    meta: "0 tópicos adicionados",
-    duration: "00:00:00",
-    gradient: "from-[#e7dfd0] via-[#f4ecde] to-[#d4c19e]",
-  };
-}
-
-export function readTempSubjects(storageKey: string = tempSubjectsStorageKey): SubjectCardData[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const stored = window.sessionStorage.getItem(storageKey);
-    const parsed = stored ? (JSON.parse(stored) as SubjectCardData[]) : [];
-    return parsed.map(normalizeSubjectMeta);
-  } catch {
-    return [];
-  }
-}
-
-export function writeTempSubjects(
-  subjects: SubjectCardData[],
-  storageKey: string = tempSubjectsStorageKey,
-) {
-  if (typeof window === "undefined") {
     return;
   }
 
