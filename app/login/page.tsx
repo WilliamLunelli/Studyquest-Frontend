@@ -38,11 +38,24 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const payload = (await response.json()) as { message: string };
+      const payload = (await response.json()) as {
+        message?: string;
+        error?: string;
+        token?: string;
+        user?: unknown;
+      };
 
       if (!response.ok) {
-        setErrorMessage(payload.message || "Não foi possível fazer login.");
+        setErrorMessage(payload.message || payload.error || "Não foi possível fazer login.");
         return;
+      }
+
+      if (payload.token) {
+        localStorage.setItem("studyquest_token", payload.token);
+      }
+
+      if (payload.user) {
+        localStorage.setItem("studyquest_user", JSON.stringify(payload.user));
       }
 
       router.push("/dashboard");

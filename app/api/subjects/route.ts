@@ -69,25 +69,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message }, { status: 500 });
   }
 }
-
-    const area = await prisma.area.findUnique({
-      where: { areaName },
-    });
-
-    if (!area) {
-      return NextResponse.json({ message: "Área inválida." }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      subject: {
-        subjectName: normalizeSubjectTitle(subjectName),
-        subjectDescription: subjectDescription || null,
-        areaName: area.areaName,
-      },
-      message: "Matéria salva apenas nesta sessão.",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro interno ao registrar matéria.";
-    return NextResponse.json({ message }, { status: 500 });
-  }
-}

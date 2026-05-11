@@ -63,8 +63,3 @@ export function matchesSubjectFilter(areaName: string | undefined, filter: Subje
 
   return areaName === filter;
 }
-    return;
-  }
-
-  window.sessionStorage.setItem(storageKey, JSON.stringify(subjects));
-}

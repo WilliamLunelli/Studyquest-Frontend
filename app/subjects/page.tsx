@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { SubjectCard } from "@/components/SubjectCard";
 import { menuMain, menuProfile, type SubjectCardData } from "@/lib/constants";
 import { type SubjectAreaFilter, matchesSubjectFilter } from "@/lib/frontend/subjects";
-import { createTempSubjectClient, fetchSubjectsClient } from "@/lib/services/subjects-client";
+import { fetchSubjectsClient } from "@/lib/services/subjects-client";
 
 const areaOptions = ["Humanas", "Linguagens", "Exatas"];
 
@@ -66,22 +66,8 @@ export default function SubjectsPage() {
       return;
     }
 
-    try {
-      const newSubject = createTempSubjectClient({
-        subjectName: trimmedName,
-        areaName,
-      });
-
-      setSubjects((currentSubjects) => [newSubject, ...currentSubjects]);
-      setSubjectName("");
-      setSubjectDescription("");
-      setAreaName(areaOptions[0]);
-      setIsCreateOpen(false);
-    } catch {
-      setErrorMessage("Erro ao salvar matéria. Tente novamente.");
-    } finally {
-      setIsSaving(false);
-    }
+    setErrorMessage("Criação de matérias foi desativada nesta integração. Use os registros de estudo.");
+    setIsSaving(false);
   }
 
   if (isLoading && subjects.length === 0) {

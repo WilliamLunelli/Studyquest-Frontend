@@ -11,6 +11,21 @@ export type LoginResult =
   | { status: "error"; message: string }
   | { status: "invalid"; message: string };
 
+function isAuthResponse(value: unknown): value is AuthResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as { message?: unknown; token?: unknown; user?: unknown };
+
+  return (
+    typeof candidate.message === "string" &&
+    typeof candidate.token === "string" &&
+    typeof candidate.user === "object" &&
+    candidate.user !== null
+  );
+}
+
 export async function loginClient(
   email: string,
   password: string
@@ -37,7 +52,11 @@ export async function loginClient(
     }
 
     // Save JWT and user to localStorage
-    const loginData = data as AuthResponse;
+    if (!isAuthResponse(data)) {
+      return { status: "error", message: "Resposta inválida do servidor de autenticação." };
+    }
+
+    const loginData = data;
     saveAuth(loginData);
 
     return { status: "success", data: loginData };

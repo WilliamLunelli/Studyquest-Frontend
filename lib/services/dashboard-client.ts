@@ -1,4 +1,5 @@
 import { type DashboardPayload, mapDashboardPayload } from "@/lib/frontend/dashboard";
+import { getAuthHeader } from "@/lib/api-config";
 
 type DashboardApiError = { message: string };
 
@@ -9,8 +10,13 @@ type DashboardClientResult =
 
 export async function fetchDashboardClient(): Promise<DashboardClientResult> {
   try {
+    const authHeader = getAuthHeader();
+
     const response = await fetch("/api/dashboard", {
       credentials: "include",
+      headers: {
+        ...authHeader,
+      },
     });
 
     if (response.status === 401) {
