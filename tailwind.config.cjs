@@ -14,6 +14,13 @@ module.exports = {
         ink: {
           950: "#050816",
         },
+        page: "var(--color-background)",
+        surface: "var(--color-surface)",
+        "surface-muted": "var(--color-surface-muted)",
+        foreground: "var(--color-foreground)",
+        muted: "var(--color-muted)",
+        border: "var(--color-border)",
+        accent: "var(--color-accent)",
       },
       backgroundImage: {
         "hero-grid":

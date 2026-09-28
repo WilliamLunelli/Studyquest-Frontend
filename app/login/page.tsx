@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function SocialButton({ src, alt }: { src: string; alt: string }) {
   return (
@@ -71,6 +72,9 @@ export default function LoginPage() {
       <div className="grid min-h-dvh w-full overflow-hidden bg-[#f3f2f2] lg:grid-cols-[1fr_1fr]">
         <section className="flex min-h-dvh items-center justify-center px-5 py-8 sm:px-10 sm:py-12">
           <div className="w-full max-w-md">
+            <div className="mb-8 flex justify-end">
+              <ThemeToggle />
+            </div>
             <h1 className="font-display text-3xl font-semibold text-slate-800 sm:text-[34px]">Entre</h1>
             <p className="mt-4 text-base text-slate-500 sm:text-[18px]">
               Ainda não cadastrado?{" "}

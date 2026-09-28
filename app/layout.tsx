@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
+
+const themeInitializer = `(() => {
+  try {
+    const stored = localStorage.getItem("studyquest_theme");
+    const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const theme = stored === "dark" || stored === "light" ? stored : preferred;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+  } catch {}
+})();`;
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -24,7 +35,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
+    <html lang="pt-BR" suppressHydrationWarning className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
+      <head>
+        <Script id="studyquest-theme" strategy="beforeInteractive">
+          {themeInitializer}
+        </Script>
+      </head>
       <body>{children}</body>
     </html>
   );

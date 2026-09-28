@@ -4,6 +4,26 @@
 
 :root {
   color-scheme: light;
+  --color-background: #f3f2f2;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eae9e9;
+  --color-foreground: #201e1d;
+  --color-muted: #706d75;
+  --color-border: #dfdde3;
+  --color-accent: #ec3013;
+  --color-accent-soft: #ffe4df;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --color-background: #141211;
+  --color-surface: #1e1b1a;
+  --color-surface-muted: #292523;
+  --color-foreground: #f2efee;
+  --color-muted: #b6afb0;
+  --color-border: #3b3533;
+  --color-accent: #ff563c;
+  --color-accent-soft: #4a211c;
 }
 
 html {
@@ -11,17 +31,80 @@ html {
 }
 
 body {
-  @apply bg-white text-slate-900 antialiased;
-  background-image:
-    radial-gradient(circle at 10% 5%, rgba(159, 228, 241, 0.45), transparent 34%),
-    radial-gradient(circle at 95% 12%, rgba(151, 79, 201, 0.22), transparent 30%),
-    radial-gradient(circle at 50% 94%, rgba(242, 174, 143, 0.35), transparent 40%),
-    linear-gradient(180deg, #ffffff 0%, #fff9f7 100%);
+  @apply antialiased;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 ::selection {
-  background: rgba(151, 79, 201, 0.2);
-  color: #2a1538;
+  background: var(--color-accent-soft);
+  color: var(--color-foreground);
+}
+
+@layer utilities {
+  .bg-page {
+    background-color: var(--color-background);
+  }
+
+  .bg-surface {
+    background-color: var(--color-surface);
+  }
+
+  .bg-surface-muted {
+    background-color: var(--color-surface-muted);
+  }
+
+  .text-foreground {
+    color: var(--color-foreground);
+  }
+
+  .text-muted {
+    color: var(--color-muted);
+  }
+
+  .border-border {
+    border-color: var(--color-border);
+  }
+
+  .text-accent {
+    color: var(--color-accent);
+  }
+}
+
+@layer base {
+  html.dark .bg-white,
+  html.dark .bg-white\/90,
+  html.dark .bg-white\/85,
+  html.dark .bg-white\/80 {
+    background-color: var(--color-surface);
+  }
+
+  html.dark .bg-slate-50,
+  html.dark .bg-\[\#f3f2f2\],
+  html.dark .bg-\[\#f4f4f4\],
+  html.dark .bg-\[\#f5f5f5\],
+  html.dark .bg-\[\#f7f4fb\] {
+    background-color: var(--color-surface-muted);
+  }
+
+  html.dark .text-slate-900,
+  html.dark .text-slate-800,
+  html.dark .text-slate-700 {
+    color: var(--color-foreground);
+  }
+
+  html.dark .text-slate-600,
+  html.dark .text-slate-500,
+  html.dark .text-slate-400 {
+    color: var(--color-muted);
+  }
+
+  html.dark .border-slate-200,
+  html.dark .border-slate-300,
+  html.dark .border-slate-400\/60 {
+    border-color: var(--color-border);
+  }
 }
 
 .grid-pattern {

@@ -1,3 +1,5 @@
+import { ThemeToggle } from "@/components/ThemeToggle";
+
 const navLinks = [
   { href: "#sobre", label: "Mais sobre a plataforma" },
   { href: "#contato", label: "Fale com a gente" },
@@ -52,6 +54,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <a
               href="#"
               className="inline-flex min-h-11 items-center rounded-full border border-[#974FC9]/25 bg-white px-3 py-2 text-xs font-medium text-[#6b2fa3] transition hover:bg-[#f7effd] sm:px-4 sm:text-sm"
