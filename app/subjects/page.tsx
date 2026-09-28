@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { Bell, CircleUserRound, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
@@ -89,7 +89,7 @@ export default function SubjectsPage() {
           <div className="space-y-4">
             <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl py-1">
               <label className="relative w-full max-w-[520px]">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
+                <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   type="text"
                   placeholder="Procurar matérias, usuários"
@@ -103,16 +103,11 @@ export default function SubjectsPage() {
                   className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f4f4f4] text-slate-500 ring-1 ring-black/5"
                   aria-label="Notificações"
                 >
-                  <Image
-                    src="/images/dashboard/notification.png"
-                    alt="Notificações"
-                    width={24}
-                    height={24}
-                  />
+                  <Bell aria-hidden="true" size={20} />
                 </button>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-slate-300">
-                  ○
-                </div>
+                <button type="button" aria-label="Abrir perfil" className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-slate-400">
+                  <CircleUserRound aria-hidden="true" size={21} />
+                </button>
               </div>
             </header>
 

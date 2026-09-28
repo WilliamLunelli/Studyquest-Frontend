@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
@@ -38,7 +39,7 @@ export function ThemeToggle() {
       aria-pressed={theme === "dark"}
       className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-medium text-muted transition hover:border-accent hover:text-accent"
     >
-      <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+      {theme === "dark" ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
       <span>{theme === "dark" ? "Claro" : "Escuro"}</span>
     </button>
   );

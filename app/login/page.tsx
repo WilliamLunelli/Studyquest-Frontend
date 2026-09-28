@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Eye, EyeOff } from "lucide-react";
 
 function SocialButton({ src, alt }: { src: string; alt: string }) {
   return (
@@ -120,13 +121,7 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 transition hover:opacity-70"
                   >
-                    <Image
-                      src={showPassword ? "/images/auth/showPass/eye-on.png" : "/images/auth/showPass/eye-off.png"}
-                      alt={showPassword ? "Hide password" : "Show password"}
-                      width={20}
-                      height={20}
-                      className="h-5 w-5"
-                    />
+                    {showPassword ? <EyeOff aria-hidden="true" size={20} /> : <Eye aria-hidden="true" size={20} />}
                   </button>
                 </div>
                 <div className="pt-1 text-right">

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Pause, Play, Square } from "lucide-react";
 import {
   type ActiveSession,
   type CreateSessionInput,
@@ -167,11 +168,11 @@ function SessionPageContent() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {session.status === "RUNNING" ? (
-              <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => pauseSession(session.id))} className="min-h-12 rounded-full border border-border px-4 py-3 font-semibold text-foreground disabled:opacity-50">Pausar</button>
+              <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => pauseSession(session.id))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-border px-4 py-3 font-semibold text-foreground disabled:opacity-50"><Pause aria-hidden="true" size={17} />Pausar</button>
             ) : (
-              <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => resumeSession(session.id))} className="min-h-12 rounded-full bg-accent px-4 py-3 font-semibold text-white disabled:opacity-50">Retomar</button>
+              <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => resumeSession(session.id))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent px-4 py-3 font-semibold text-white disabled:opacity-50"><Play aria-hidden="true" size={17} />Retomar</button>
             )}
-            <button type="button" disabled={isBusy} onClick={() => setAssessment(assessment ?? "ok")} className="min-h-12 rounded-full bg-accent px-4 py-3 font-semibold text-white disabled:opacity-50">Encerrar</button>
+            <button type="button" disabled={isBusy} onClick={() => setAssessment(assessment ?? "ok")} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-accent px-4 py-3 font-semibold text-white disabled:opacity-50"><Square aria-hidden="true" size={17} />Encerrar</button>
           </div>
           {assessment ? (
             <div className="space-y-3 rounded-3xl border border-border bg-surface p-5">
