@@ -21,6 +21,8 @@ module.exports = {
         muted: "var(--color-muted)",
         border: "var(--color-border)",
         accent: "var(--color-accent)",
+        warm: "var(--color-support-warm)",
+        cool: "var(--color-support-cool)",
       },
       backgroundImage: {
         "hero-grid":

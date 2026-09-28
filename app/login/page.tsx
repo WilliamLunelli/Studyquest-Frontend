@@ -141,7 +141,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:bg-[#873abf] sm:h-14 sm:text-[24px]"
+                className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:brightness-95 sm:h-14 sm:text-[24px]"
               >
                 {isLoading ? "Entrando..." : "Continuar"}
               </button>

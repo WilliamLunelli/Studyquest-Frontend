@@ -12,8 +12,12 @@ export const API_CONFIG = {
     register: "/users/register",
     me: "/users/me",
     
-    // Records (Study Sessions)
+    // Legacy records endpoint kept until the dashboard contract is migrated.
     records: "/registros",
+
+    // Timed study sessions
+    sessions: "/sessions",
+    activeSession: "/sessions/active",
   },
   
   // HTTP Headers

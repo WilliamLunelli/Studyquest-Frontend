@@ -10,8 +10,10 @@
   --color-foreground: #201e1d;
   --color-muted: #706d75;
   --color-border: #dfdde3;
-  --color-accent: #ec3013;
-  --color-accent-soft: #ffe4df;
+  --color-accent: #974fc9;
+  --color-accent-soft: #f1e5f8;
+  --color-support-warm: #f2ae8f;
+  --color-support-cool: #9fe4f1;
 }
 
 :root.dark {
@@ -22,8 +24,10 @@
   --color-foreground: #f2efee;
   --color-muted: #b6afb0;
   --color-border: #3b3533;
-  --color-accent: #ff563c;
-  --color-accent-soft: #4a211c;
+  --color-accent: #974fc9;
+  --color-accent-soft: #3b234a;
+  --color-support-warm: #f2ae8f;
+  --color-support-cool: #9fe4f1;
 }
 
 html {
@@ -69,6 +73,22 @@ body {
 
   .text-accent {
     color: var(--color-accent);
+  }
+
+  .bg-support-warm {
+    background-color: var(--color-support-warm);
+  }
+
+  .bg-support-cool {
+    background-color: var(--color-support-cool);
+  }
+
+  .text-support-warm {
+    color: var(--color-support-warm);
+  }
+
+  .text-support-cool {
+    color: var(--color-support-cool);
   }
 }
 

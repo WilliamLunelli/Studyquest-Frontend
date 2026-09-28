@@ -46,7 +46,7 @@ export default function Home() {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-slate-600 transition hover:text-[#6b2fa3]"
+                className="text-sm font-medium text-slate-600 transition hover:text-[#974FC9]"
               >
                 {link.label}
               </a>
@@ -57,13 +57,13 @@ export default function Home() {
             <ThemeToggle />
             <a
               href="#"
-              className="inline-flex min-h-11 items-center rounded-full border border-[#974FC9]/25 bg-white px-3 py-2 text-xs font-medium text-[#6b2fa3] transition hover:bg-[#f7effd] sm:px-4 sm:text-sm"
+              className="inline-flex min-h-11 items-center rounded-full border border-[#974FC9]/25 bg-white px-3 py-2 text-xs font-medium text-[#974FC9] transition hover:bg-[#f1e5f8] sm:px-4 sm:text-sm"
             >
               Cadastrar
             </a>
             <a
               href="/login"
-              className="inline-flex min-h-11 items-center rounded-full bg-[#974FC9] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#873abf] sm:px-4 sm:text-sm"
+              className="inline-flex min-h-11 items-center rounded-full bg-[#974FC9] px-3 py-2 text-xs font-semibold text-white transition hover:brightness-95 sm:px-4 sm:text-sm"
             >
               Entrar
             </a>
@@ -85,7 +85,7 @@ export default function Home() {
           </p>
           <a
             href="#menu"
-            className="inline-flex min-h-12 items-center rounded-full bg-[#974FC9] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] hover:bg-[#873abf]"
+            className="inline-flex min-h-12 items-center rounded-full bg-[#974FC9] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] hover:brightness-95"
           >
             Ver desafios e solução
           </a>
