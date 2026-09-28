@@ -67,9 +67,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen w-full bg-white">
-      <div className="grid min-h-screen w-full overflow-hidden bg-white lg:grid-cols-[1fr_1fr]">
-        <section className="flex min-h-screen items-center justify-center bg-[#efefef] px-4 py-10 sm:px-10 sm:py-12">
+    <main className="min-h-dvh w-full bg-[#f3f2f2]">
+      <div className="grid min-h-dvh w-full overflow-hidden bg-[#f3f2f2] lg:grid-cols-[1fr_1fr]">
+        <section className="flex min-h-dvh items-center justify-center px-5 py-8 sm:px-10 sm:py-12">
           <div className="w-full max-w-md">
             <h1 className="font-display text-3xl font-semibold text-slate-800 sm:text-[34px]">Entre</h1>
             <p className="mt-4 text-base text-slate-500 sm:text-[18px]">
@@ -79,7 +79,7 @@ export default function LoginPage() {
               </a>
             </p>
 
-            <form className="mt-10 space-y-6" onSubmit={handleLogin}>
+            <form className="mt-8 space-y-6 sm:mt-10" onSubmit={handleLogin}>
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-base text-slate-600 sm:text-[18px]">
                   E-mail:
@@ -92,7 +92,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
-                  className="h-14 w-full rounded-2xl border border-slate-400/60 bg-[#efefef] px-4 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:text-lg"
+                    className="h-12 w-full rounded-2xl border border-slate-400/60 bg-white px-4 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:h-14 sm:text-lg"
                 />
               </div>
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     required
-                    className="h-14 w-full rounded-2xl border border-slate-400/60 bg-[#efefef] px-4 pr-12 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:text-lg"
+                    className="h-12 w-full rounded-2xl border border-slate-400/60 bg-white px-4 pr-12 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:h-14 sm:text-lg"
                   />
                   <button
                     type="button"
@@ -137,7 +137,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="mt-3 inline-flex h-14 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#974FC9] via-[#F2AE8F] to-[#9FE4F1] text-xl font-semibold text-white transition hover:brightness-95 sm:text-[24px]"
+                className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:bg-[#873abf] sm:h-14 sm:text-[24px]"
               >
                 {isLoading ? "Entrando..." : "Continuar"}
               </button>

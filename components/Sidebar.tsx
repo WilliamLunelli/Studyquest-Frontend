@@ -8,8 +8,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ menuMain, menuProfile, activeIndex = 0 }: SidebarProps) {
+  const mobileItems = menuMain.filter((item) => item.href).slice(0, 2);
+
   return (
-    <aside className="rounded-3xl bg-[#f9f9f9] px-4 py-5 sm:px-5 sm:py-6">
+    <>
+      <aside className="hidden rounded-3xl bg-[#f9f9f9] px-4 py-5 sm:px-5 sm:py-6 lg:block">
       <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-black/5 sm:py-5">
         <p className="font-display text-xl font-semibold leading-[1.05] sm:text-2xl">
           Study
@@ -35,6 +38,23 @@ export function Sidebar({ menuMain, menuProfile, activeIndex = 0 }: SidebarProps
         <span>Modo escuro</span>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">OFF</span>
       </div>
-    </aside>
+      </aside>
+
+      <nav
+        aria-label="Navegação principal"
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 items-stretch justify-around border-t border-slate-200/80 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
+      >
+        {mobileItems.map((item, index) => (
+          <SidebarItem
+            key={item.label}
+            label={index === 0 ? "Início" : item.label}
+            href={item.href}
+            active={index === activeIndex}
+            mobile
+          />
+        ))}
+        <SidebarItem label="Perfil" mobile />
+      </nav>
+    </>
   );
 }

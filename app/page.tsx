@@ -32,10 +32,6 @@ const solutionItems = [
 export default function Home() {
   return (
     <main className="relative overflow-hidden text-slate-900">
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute left-[-8rem] top-[-8rem] h-72 w-72 rounded-full bg-[#9FE4F1]/55 blur-3xl" />
-        <div className="absolute right-[-6rem] top-20 h-72 w-72 rounded-full bg-[#F2AE8F]/45 blur-3xl" />
-      </div>
 
       <header className="border-b border-[#974FC9]/10 bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:gap-6 sm:px-6 lg:px-8">
@@ -58,13 +54,13 @@ export default function Home() {
           <div className="flex items-center gap-2 sm:gap-3">
             <a
               href="#"
-              className="rounded-full border border-[#974FC9]/25 bg-white px-3 py-2 text-xs font-medium text-[#6b2fa3] transition hover:bg-[#f7effd] sm:px-4 sm:text-sm"
+              className="inline-flex min-h-11 items-center rounded-full border border-[#974FC9]/25 bg-white px-3 py-2 text-xs font-medium text-[#6b2fa3] transition hover:bg-[#f7effd] sm:px-4 sm:text-sm"
             >
               Cadastrar
             </a>
             <a
               href="/login"
-              className="rounded-full bg-[#974FC9] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#873abf] sm:px-4 sm:text-sm"
+              className="inline-flex min-h-11 items-center rounded-full bg-[#974FC9] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#873abf] sm:px-4 sm:text-sm"
             >
               Entrar
             </a>
@@ -72,12 +68,12 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-8 lg:py-24">
+      <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-10 sm:gap-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-8 lg:py-24">
         <div className="space-y-6">
           <p className="inline-flex items-center rounded-full border border-[#9FE4F1] bg-[#9FE4F1]/35 px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] text-[#2b6470]">
             Plataforma de estudos
           </p>
-          <h2 className="font-display text-5xl font-semibold leading-tight sm:text-6xl">
+          <h2 className="font-display text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
             Aprender pode ser leve, organizado e constante.
           </h2>
           <p className="max-w-xl text-lg leading-8 text-slate-600">
@@ -86,17 +82,14 @@ export default function Home() {
           </p>
           <a
             href="#menu"
-            className="inline-flex rounded-full bg-[#974FC9] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] hover:bg-[#873abf]"
+            className="inline-flex min-h-12 items-center rounded-full bg-[#974FC9] px-6 py-3 text-sm font-semibold text-white transition hover:scale-[1.01] hover:bg-[#873abf]"
           >
             Ver desafios e solução
           </a>
         </div>
 
         <div className="relative">
-          <div className="absolute -left-6 -top-6 h-28 w-28 rounded-full bg-[#9FE4F1]/55 blur-2xl" />
-          <div className="absolute -bottom-8 -right-4 h-32 w-32 rounded-full bg-[#F2AE8F]/45 blur-2xl" />
-
-          <div className="rounded-[2rem] border border-[#974FC9]/15 bg-gradient-to-br from-[#F2AE8F]/55 via-[#fce7de] to-[#9FE4F1]/45 p-5 shadow-xl shadow-[#974FC9]/10">
+          <div className="rounded-3xl border border-[#974FC9]/15 bg-gradient-to-br from-[#F2AE8F]/55 via-[#fce7de] to-[#9FE4F1]/45 p-4 shadow-xl shadow-[#974FC9]/10 sm:p-5">
             <div className="rounded-[1.4rem] border border-white/60 bg-white/80 p-6 backdrop-blur-sm">
               <p className="font-mono text-xs uppercase tracking-[0.22em] text-[#6b2fa3]">
                 Painel semanal
@@ -117,8 +110,7 @@ export default function Home() {
 
       <section id="menu" className="mx-auto w-full max-w-7xl px-6 pb-8 lg:px-8">
         <div className="mb-8 text-center">
-        
-          <h2 className="mt-3 font-display text-4xl font-semibold sm:text-5xl">Problemas reais e solução proposta</h2>
+          <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">Problemas reais e solução proposta</h2>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -152,11 +144,11 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="sobre" className="mx-auto w-full max-w-7xl px-6 py-16 lg:px-8">
+      <section id="sobre" className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <div className="rounded-3xl border border-[#974FC9]/20 bg-[#974FC9] px-6 py-10 text-white sm:px-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-display text-3xl font-semibold">Pronto para sair do modo "depois eu vejo"?</h2>
+              <h2 className="font-display text-2xl font-semibold sm:text-3xl">Pronto para sair do modo "depois eu vejo"?</h2>
               <p className="mt-2 max-w-2xl text-white/85">
                 Crie sua conta e teste uma trilha de estudos agora.
               </p>

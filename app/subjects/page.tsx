@@ -72,8 +72,8 @@ export default function SubjectsPage() {
 
   if (isLoading && subjects.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#e8ddff_0%,#dce9ff_48%,#d8f3ff_100%)] text-slate-500">
-        <div className="rounded-3xl bg-white px-6 py-4 text-sm shadow-sm ring-1 ring-black/5">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-500">
+        <div className="w-full max-w-sm rounded-2xl bg-white px-6 py-5 text-center text-sm shadow-sm ring-1 ring-slate-200">
           Carregando...
         </div>
       </main>
@@ -81,13 +81,13 @@ export default function SubjectsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(135deg,#e8ddff_0%,#dce9ff_48%,#d8f3ff_100%)] text-slate-900">
-      <div className="grid min-h-screen w-full grid-cols-1 gap-4 p-3 lg:grid-cols-[200px_minmax(0,1fr)] lg:p-4">
+    <main className="min-h-screen bg-slate-50 pb-20 text-slate-900 lg:pb-0">
+      <div className="grid min-h-screen w-full grid-cols-1 gap-4 p-0 sm:p-3 lg:grid-cols-[200px_minmax(0,1fr)] lg:p-4">
         <Sidebar menuMain={menuMain} menuProfile={menuProfile} activeIndex={1} />
 
-        <section className="px-1 py-1 lg:px-2 lg:py-1">
+        <section className="px-4 py-4 sm:px-2 lg:px-2 lg:py-1">
           <div className="space-y-4">
-            <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl p-1">
+            <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl py-1">
               <label className="relative w-full max-w-[520px]">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
                 <input
@@ -120,31 +120,31 @@ export default function SubjectsPage() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="rounded-full bg-[#c9a1f2] px-4 py-1.5 text-sm font-medium text-[#7a3cb4] transition hover:brightness-95"
+                className="min-h-11 rounded-full bg-[#c9a1f2] px-5 py-2 text-sm font-medium text-[#7a3cb4] transition hover:brightness-95"
               >
                 Adicionar matéria
               </button>
             </div>
 
-            <div className="flex items-center gap-2 px-1 text-sm text-slate-500">
+            <div className="flex items-center gap-1 overflow-x-auto px-1 text-sm text-slate-500">
               <button
                 type="button"
                 onClick={() => setSubjectFilter("Humanas")}
-                className={`rounded-full px-3 py-1 transition ${subjectFilter === "Humanas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
+                className={`min-h-11 shrink-0 rounded-full px-3 py-1 transition ${subjectFilter === "Humanas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
               >
                 Humanas
               </button>
               <button
                 type="button"
                 onClick={() => setSubjectFilter("Exatas")}
-                className={`rounded-full px-3 py-1 transition ${subjectFilter === "Exatas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
+                className={`min-h-11 shrink-0 rounded-full px-3 py-1 transition ${subjectFilter === "Exatas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
               >
                 Exatas
               </button>
               <button
                 type="button"
                 onClick={() => setSubjectFilter("Todas")}
-                className={`rounded-full px-3 py-1 transition ${subjectFilter === "Todas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
+                className={`min-h-11 shrink-0 rounded-full px-3 py-1 transition ${subjectFilter === "Todas" ? "bg-[#974FC9]/12 text-[#974FC9]" : "hover:bg-white/70"}`}
               >
                 Todas
               </button>
