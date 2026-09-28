@@ -2,16 +2,12 @@ import { NextResponse } from "next/server";
 import { API_CONFIG, buildApiUrl } from "@/lib/api-config";
 
 interface BackendLoginResponse {
-  message: string;
   token: string;
   user: {
     id: string;
+    nome: string;
     email: string;
-    username: string;
-    avatar: string | null;
-    bio: string | null;
-    level: number;
-    xp: number;
+    onboardingCompleto: boolean;
   };
 }
 
@@ -49,12 +45,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email ou senha incorretos" }, { status: 400 });
     }
 
-    // Call backend login endpoint
     const backendUrl = buildApiUrl(API_CONFIG.endpoints.login);
     const backendResponse = await fetch(backendUrl, {
       method: "POST",
       headers: API_CONFIG.headers,
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, senha: password }),
     });
 
     const backendData = await readBackendPayload(backendResponse);

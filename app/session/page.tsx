@@ -103,7 +103,7 @@ function SessionPageContent() {
       ...(selectedPreset.duration ? { duracaoAlvoMin: selectedPreset.duration } : {}),
     };
     const result = await createSession(input);
-    if (result.status === "ok") setSession(result.data);
+    if (result.status === "ok") setSession({ ...result.data, resumedAt: result.data.startedAt });
     else setMessage(result.message);
     setIsBusy(false);
   }
@@ -113,7 +113,12 @@ function SessionPageContent() {
     setIsBusy(true);
     setMessage("");
     const result = await action();
-    if (result.status === "ok") setSession(result.data);
+    if (result.status === "ok") {
+      setSession({
+        ...result.data,
+        resumedAt: result.data.status === "RUNNING" ? new Date().toISOString() : null,
+      });
+    }
     else setMessage(result.message);
     setIsBusy(false);
   }
@@ -124,7 +129,7 @@ function SessionPageContent() {
     setMessage("");
     const result = await finishSession(session.id, assessment, note);
     if (result.status === "ok") {
-      setFinished({ xp: result.data.xp, minutes: result.data.sessao.minutosTotais });
+      setFinished({ xp: result.data.xp.ganho, minutes: result.data.sessao.minutosTotais });
       setSession(null);
     } else {
       setMessage(result.message);

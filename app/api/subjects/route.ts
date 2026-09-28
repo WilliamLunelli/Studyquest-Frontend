@@ -2,70 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractTokenFromRequest } from "@/lib/jwt-middleware";
 import { buildApiUrl, API_CONFIG } from "@/lib/api-config";
 
-/**
- * Aggregate study sessions by subject
- */
-function aggregateSubjectsBySession(sessions: Array<{ subjectId: string; studyTime: number }>) {
-  const subjectMap = new Map<string, number>();
-
-  for (const session of sessions) {
-    const current = subjectMap.get(session.subjectId) || 0;
-    subjectMap.set(session.subjectId, current + session.studyTime);
-  }
-
-  return Array.from(subjectMap.entries()).map(([subjectId, totalTime]) => ({
-    subjectId,
-    totalTime,
-  }));
-}
+type MeResponse = { objetivo: { id: string } | null };
+type GoalWeight = { area: string; subjects: Array<{ id: string; nome: string }> };
 
 export async function GET(request: NextRequest) {
+  const token = extractTokenFromRequest(request);
+  if (!token) return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
+
+  const headers = { ...API_CONFIG.headers, Authorization: `Bearer ${token}` };
   try {
-    // Extract JWT from Authorization header
-    const token = extractTokenFromRequest(request);
+    const meResponse = await fetch(buildApiUrl(API_CONFIG.endpoints.me), { headers });
+    if (meResponse.status === 401) return NextResponse.json({ message: "Token inválido." }, { status: 401 });
+    if (!meResponse.ok) return NextResponse.json({ message: "Não foi possível carregar o usuário." }, { status: meResponse.status });
 
-    if (!token) {
-      return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
+    const me = (await meResponse.json()) as MeResponse;
+    if (!me.objetivo) return NextResponse.json({ message: "Defina um objetivo antes de carregar matérias.", subjects: [] });
+
+    const weightsResponse = await fetch(buildApiUrl(`${API_CONFIG.endpoints.goals}/${me.objetivo.id}/weights`), { headers });
+    const weights = (await weightsResponse.json()) as GoalWeight[] | { message?: string };
+    if (!weightsResponse.ok) {
+      return NextResponse.json({ message: "message" in weights ? weights.message : "Não foi possível carregar matérias." }, { status: weightsResponse.status });
     }
 
-    // Call backend to get records
-    const recordsUrl = buildApiUrl(API_CONFIG.endpoints.records);
-    const recordsResponse = await fetch(recordsUrl, {
-      method: "GET",
-      headers: {
-        ...API_CONFIG.headers,
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const subjects = (weights as GoalWeight[]).flatMap((weight) => weight.subjects.map((subject) => ({
+      subjectId: subject.id,
+      title: subject.nome,
+      areaName: weight.area,
+      meta: `Área: ${weight.area}`,
+      duration: "00:00:00",
+      gradient: "from-[#ece4d8] via-[#f6efe3] to-[#d8c7ad]",
+    })));
 
-    if (recordsResponse.status === 401) {
-      return NextResponse.json({ message: "Token inválido." }, { status: 401 });
-    }
-
-    if (!recordsResponse.ok) {
-      const error = (await recordsResponse.json()) as { message?: string };
-      return NextResponse.json(
-        { message: error.message ?? "Erro ao buscar registros." },
-        { status: recordsResponse.status }
-      );
-    }
-
-    const recordsData = (await recordsResponse.json()) as {
-      sessions: Array<{ id: string; subjectId: string; studyTime: number; createdAt: string }>;
-    };
-
-    // Aggregate subjects from study sessions
-    const subjects = aggregateSubjectsBySession(recordsData.sessions);
-
-    return NextResponse.json(
-      {
-        message: "Subjects aggregated from study sessions.",
-        subjects,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: "Subjects loaded from the active goal.", subjects }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro interno ao carregar matérias.";
-    return NextResponse.json({ message }, { status: 500 });
+    return NextResponse.json({ message }, { status: 502 });
   }
 }

@@ -1,7 +1,7 @@
 /**
  * Login Client
  * Handles login request and JWT storage
- * Contract: POST /api/users/login → { message, token, user }
+ * Contract: POST /api/auth/login → { token, user }
  */
 
 import { saveAuth, AuthResponse } from "@/lib/jwt-auth";
@@ -16,10 +16,9 @@ function isAuthResponse(value: unknown): value is AuthResponse {
     return false;
   }
 
-  const candidate = value as { message?: unknown; token?: unknown; user?: unknown };
+  const candidate = value as { token?: unknown; user?: unknown };
 
   return (
-    typeof candidate.message === "string" &&
     typeof candidate.token === "string" &&
     typeof candidate.user === "object" &&
     candidate.user !== null

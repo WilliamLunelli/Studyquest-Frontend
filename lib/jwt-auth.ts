@@ -8,16 +8,12 @@ import { API_CONFIG } from "@/lib/api-config";
 
 export interface User {
   id: string;
+  nome: string;
   email: string;
-  username: string;
-  avatar: string | null;
-  bio: string | null;
-  level: number;
-  xp: number;
+  onboardingCompleto: boolean;
 }
 
 export interface AuthResponse {
-  message: string;
   token: string;
   user: User;
 }

@@ -8,12 +8,14 @@ export const API_CONFIG = {
   
   endpoints: {
     // Authentication
-    login: "/users/login",
-    register: "/users/register",
-    me: "/users/me",
-    
-    // Legacy records endpoint kept until the dashboard contract is migrated.
-    records: "/registros",
+    login: "/auth/login",
+    register: "/auth/register",
+    me: "/auth/me",
+
+    // Aggregated backend payloads
+    dashboard: "/dashboard",
+    home: "/home",
+    goals: "/goals",
 
     // Timed study sessions
     sessions: "/sessions",

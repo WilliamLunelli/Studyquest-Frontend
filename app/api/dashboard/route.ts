@@ -1,140 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractTokenFromRequest } from "@/lib/jwt-middleware";
 import { buildApiUrl, API_CONFIG } from "@/lib/api-config";
+import { extractTokenFromRequest } from "@/lib/jwt-middleware";
 
-type StudySession = {
-  id: string;
-  userId: string;
-  subjectId: string;
-  studyTime: number;
-  questions: number;
-  rate: number;
-  createdAt: string;
+type BackendMe = { id: string; nome: string; email: string; xpTotal: number; nivel: number };
+type BackendDashboard = {
+  cobertura: { assuntosVistos: number };
+  horasPorMateria: Array<{ materia: string; minutosReaisSemana: number }>;
 };
 
-function formatDuration(seconds: number) {
-  const safe = Math.max(0, seconds);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const remainingSeconds = safe % 60;
+const gradients = [
+  "from-[#ece4d8] via-[#f6efe3] to-[#d8c7ad]",
+  "from-[#d6cec4] via-[#e8ddd1] to-[#bba692]",
+  "from-[#e7dfd0] via-[#f4ecde] to-[#d4c19e]",
+  "from-[#dbd4c9] via-[#ebe1d5] to-[#bca891]",
+];
 
-  return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
-}
-
-function estimateSessionXp(studyTime: number, questions: number, rate: number) {
-  return Math.round(studyTime / 3 + questions * 2 + rate * 10);
-}
-
-function buildPendingSubjects(sessions: StudySession[]) {
-  const bySubject = new Map<string, { seconds: number; count: number }>();
-
-  for (const session of sessions) {
-    const current = bySubject.get(session.subjectId) ?? { seconds: 0, count: 0 };
-    bySubject.set(session.subjectId, {
-      seconds: current.seconds + session.studyTime * 60,
-      count: current.count + 1,
-    });
-  }
-
-  return Array.from(bySubject.entries())
-    .sort((a, b) => b[1].seconds - a[1].seconds)
-    .slice(0, 6)
-    .map(([subjectId, value], index) => ({
-      title: `Matéria ${subjectId.slice(0, 8)}`,
-      areaName: "Linguagens",
-      meta: `${value.count} tópico${value.count > 1 ? "s" : ""} registrado${value.count > 1 ? "s" : ""}`,
-      duration: formatDuration(value.seconds),
-      gradient:
-        [
-          "from-[#ece4d8] via-[#f6efe3] to-[#d8c7ad]",
-          "from-[#d6cec4] via-[#e8ddd1] to-[#bba692]",
-          "from-[#e7dfd0] via-[#f4ecde] to-[#d4c19e]",
-          "from-[#dbd4c9] via-[#ebe1d5] to-[#bca891]",
-        ][index % 4],
-    }));
+function formatDuration(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  return [Math.floor(safeMinutes / 60), safeMinutes % 60, 0]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 }
 
 export async function GET(request: NextRequest) {
+  const token = extractTokenFromRequest(request);
+  if (!token) return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
+
+  const headers = { ...API_CONFIG.headers, Authorization: `Bearer ${token}` };
   try {
-    // Extract JWT from Authorization header
-    const token = extractTokenFromRequest(request);
+    const meResponse = await fetch(buildApiUrl(API_CONFIG.endpoints.me), { headers });
+    if (meResponse.status === 401) return NextResponse.json({ message: "Token inválido." }, { status: 401 });
+    if (!meResponse.ok) return NextResponse.json({ message: "Não foi possível carregar o usuário." }, { status: meResponse.status });
 
-    if (!token) {
-      return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
-    }
-
-    // Call backend to get records
-    const recordsUrl = buildApiUrl(API_CONFIG.endpoints.records);
-    const recordsResponse = await fetch(recordsUrl, {
-      method: "GET",
-      headers: {
-        ...API_CONFIG.headers,
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (recordsResponse.status === 401) {
-      return NextResponse.json({ message: "Token inválido." }, { status: 401 });
-    }
-
-    if (!recordsResponse.ok) {
-      const error = (await recordsResponse.json()) as { message?: string };
-      return NextResponse.json(
-        { message: error.message ?? "Erro ao buscar registros no backend." },
-        { status: recordsResponse.status }
-      );
-    }
-
-    const recordsData = (await recordsResponse.json()) as { sessions: StudySession[] };
-    const sessions = recordsData.sessions ?? [];
-
-    const now = Date.now();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const previousWeekStart = now - 2 * weekMs;
-    const currentWeekStart = now - weekMs;
-
-    const weeklySessions = sessions.filter((session) => new Date(session.createdAt).getTime() >= currentWeekStart);
-    const previousWeeklySessions = sessions.filter((session) => {
-      const createdAt = new Date(session.createdAt).getTime();
-      return createdAt >= previousWeekStart && createdAt < currentWeekStart;
-    });
-
-    const weeklyXp = weeklySessions.reduce(
-      (accumulator, session) => accumulator + estimateSessionXp(session.studyTime, session.questions, session.rate),
-      0,
-    );
-    const previousWeeklyXp = previousWeeklySessions.reduce(
-      (accumulator, session) => accumulator + estimateSessionXp(session.studyTime, session.questions, session.rate),
-      0,
-    );
-    const totalXp = sessions.reduce(
-      (accumulator, session) => accumulator + estimateSessionXp(session.studyTime, session.questions, session.rate),
-      0,
-    );
-
-    const weeklyGrowth =
-      previousWeeklyXp === 0 ? (weeklyXp > 0 ? 100 : 0) : Math.round(((weeklyXp - previousWeeklyXp) / previousWeeklyXp) * 100);
+    const user = (await meResponse.json()) as BackendMe;
+    const dashboardResponse = await fetch(`${buildApiUrl(API_CONFIG.endpoints.dashboard)}?periodo=30d`, { headers });
+    const dashboard = dashboardResponse.ok ? ((await dashboardResponse.json()) as BackendDashboard) : null;
+    const pendingSubjects = (dashboard?.horasPorMateria ?? []).map((subject, index) => ({
+      title: subject.materia,
+      meta: "Dados do ciclo atual",
+      duration: formatDuration(subject.minutosReaisSemana),
+      gradient: gradients[index % gradients.length],
+    }));
 
     return NextResponse.json({
-      user: {
-        id: "local-user",
-        email: "",
-        username: "Estudante",
-        level: Math.max(1, Math.floor(totalXp / 500) + 1),
-        xp: totalXp,
-      },
-      stats: {
-        weeklyTopics: weeklySessions.length,
-        totalXp,
-        weeklyXp,
-        weeklyGrowth,
-        badges: 0,
-      },
-      pendingSubjects: buildPendingSubjects(sessions),
+      user: { id: user.id, email: user.email, username: user.nome, level: user.nivel, xp: user.xpTotal },
+      stats: { weeklyTopics: dashboard?.cobertura.assuntosVistos ?? 0, totalXp: user.xpTotal, weeklyXp: 0, weeklyGrowth: 0, badges: 0 },
+      pendingSubjects,
       ranking: [],
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro interno ao carregar dashboard.";
-    return NextResponse.json({ message }, { status: 500 });
+    return NextResponse.json({ message }, { status: 502 });
   }
 }

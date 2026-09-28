@@ -37,7 +37,14 @@ export type FinishedSession = {
     tipo: SessionType;
     finishedAt: string;
   };
-  xp: number;
+  xp: {
+    ganho: number;
+    multiplicador: number;
+    total: number;
+    nivelAnterior: number;
+    nivelAtual: number;
+    subiuDeNivel: boolean;
+  };
   streak: {
     atual: number;
     recorde: number;
