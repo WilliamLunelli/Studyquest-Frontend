@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
+import { OfflineStatus } from "@/components/OfflineStatus";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import "./globals.css";
 
 const themeInitializer = `(() => {
@@ -27,6 +29,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "StudyQuest | Aprenda com constância",
   description: "Landing page da StudyQuest com foco, progresso e uma rotina de estudo mais leve.",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -41,7 +44,11 @@ export default function RootLayout({
           {themeInitializer}
         </Script>
       </head>
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerRegistration />
+        <OfflineStatus />
+        {children}
+      </body>
     </html>
   );
 }
