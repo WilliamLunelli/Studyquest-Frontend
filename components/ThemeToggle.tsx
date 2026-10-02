@@ -8,8 +8,13 @@ type Theme = "light" | "dark";
 const STORAGE_KEY = "studyquest_theme";
 
 function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
+  const root = document.documentElement;
+  root.classList.add("theme-switching");
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = theme;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => root.classList.remove("theme-switching"));
+  });
 }
 
 export function ThemeToggle() {

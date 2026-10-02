@@ -7,8 +7,8 @@ export type SelfAssessment = "travei" | "ok" | "tranquilo";
 
 export type CreateSessionInput = {
   blocoId?: string;
-  subjectId: string;
-  topicId: string;
+  subjectId?: string;
+  topicId?: string;
   tipo: SessionType;
   preset: SessionPreset;
   duracaoAlvoMin?: 25 | 50;

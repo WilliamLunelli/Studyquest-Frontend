@@ -4,8 +4,12 @@ import { extractTokenFromRequest } from "@/lib/jwt-middleware";
 
 type BackendMe = { id: string; nome: string; email: string; xpTotal: number; nivel: number };
 type BackendDashboard = {
-  cobertura: { assuntosVistos: number };
-  horasPorMateria: Array<{ materia: string; minutosReaisSemana: number }>;
+  cobertura: { assuntosTotais: number; assuntosVistos: number; percentual: number };
+  horasPorMateria: Array<{ subjectId: string; materia: string; peso: number; minutosIdeaisSemana: number; minutosReaisSemana: number; desvioPercentual: number; status: string }>;
+  acertoPorAssunto: Array<{ topicId: string; assunto: string; materia: string; feitas: number; acertadas: number; percentual: number }>;
+  excessoConfianca: Array<{ topicId: string; assunto: string; materia: string; autoavaliacoesTranquilo: number; percentualAcerto: number; revisaoAntecipada: boolean }>;
+  streak: { atual: number; recorde: number; escudosDisponiveis: number };
+  aderenciaCiclo: { blocosPlanejados: number; blocosConcluidos: number; percentual: number };
 };
 
 const gradients = [
@@ -33,7 +37,8 @@ export async function GET(request: NextRequest) {
     if (!meResponse.ok) return NextResponse.json({ message: "Não foi possível carregar o usuário." }, { status: meResponse.status });
 
     const user = (await meResponse.json()) as BackendMe;
-    const dashboardResponse = await fetch(`${buildApiUrl(API_CONFIG.endpoints.dashboard)}?periodo=30d`, { headers });
+    const periodo = request.nextUrl.searchParams.get("periodo") ?? "7d";
+    const dashboardResponse = await fetch(`${buildApiUrl(API_CONFIG.endpoints.dashboard)}?periodo=${encodeURIComponent(periodo)}`, { headers });
     const dashboard = dashboardResponse.ok ? ((await dashboardResponse.json()) as BackendDashboard) : null;
     const pendingSubjects = (dashboard?.horasPorMateria ?? []).map((subject, index) => ({
       title: subject.materia,
@@ -44,7 +49,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, username: user.nome, level: user.nivel, xp: user.xpTotal },
-      stats: { weeklyTopics: dashboard?.cobertura.assuntosVistos ?? 0, totalXp: user.xpTotal, weeklyXp: 0, weeklyGrowth: 0, badges: 0 },
+      dashboard,
+      periodo,
+      stats: { weeklyTopics: dashboard?.cobertura.assuntosVistos ?? 0, totalXp: user.xpTotal },
       pendingSubjects,
       ranking: [],
     });

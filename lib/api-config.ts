@@ -10,12 +10,19 @@ export const API_CONFIG = {
     // Authentication
     login: "/auth/login",
     register: "/auth/register",
+    forgotPassword: "/auth/forgot-password",
+    resetPassword: "/auth/reset-password",
     me: "/auth/me",
 
     // Aggregated backend payloads
     dashboard: "/dashboard",
     home: "/home",
     goals: "/goals",
+    onboardingGoal: "/me/goal",
+    onboardingAvailability: "/me/availability",
+    onboardingDifficulties: "/me/difficulties",
+    cycles: "/cycles",
+    reviews: "/reviews",
 
     // Timed study sessions
     sessions: "/sessions",

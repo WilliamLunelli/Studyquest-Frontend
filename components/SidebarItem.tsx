@@ -20,11 +20,9 @@ export function SidebarItem({ label, active, href, mobile = false }: SidebarItem
   const iconByLabel: Record<string, LucideIcon> = {
     "Menu Principal": Home,
     Início: Home,
-    Matérias: BookOpen,
-    Calendário: CalendarDays,
+    Sessão: BookOpen,
     Perfil: UserCircle,
     "Sua experiência": Trophy,
-    "Matérias favoritas": Star,
     Configurações: Settings,
   };
   const Icon = iconByLabel[label] ?? UserCircle;

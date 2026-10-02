@@ -38,7 +38,13 @@ body {
   @apply antialiased;
   background: var(--color-background);
   color: var(--color-foreground);
-  transition: background-color 180ms ease, color 180ms ease;
+}
+
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 ::selection {

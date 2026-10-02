@@ -1,176 +1,88 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Eye, EyeOff } from "lucide-react";
-
-function SocialButton({ src, alt }: { src: string; alt: string }) {
-  return (
-    <button
-      type="button"
-      className="flex flex-1 h-12 items-center justify-center rounded-full border border-slate-500/55 bg-transparent transition hover:bg-white/55"
-    >
-      <Image src={src} alt={alt} width={28} height={28} className="h-7 w-7" />
-    </button>
-  );
-}
+import { AuthShell } from "@/components/AuthShell";
+import { AuthError, AuthInput, PasswordInput } from "@/components/AuthFields";
+import { loginClient } from "@/lib/services/login-client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const router = useRouter();
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
     setIsLoading(true);
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    const result = await loginClient(email, password);
 
-      const payload = (await response.json()) as {
-        message?: string;
-        error?: string;
-        token?: string;
-        user?: unknown;
-      };
-
-      if (!response.ok) {
-        setErrorMessage(payload.message || payload.error || "Não foi possível fazer login.");
-        return;
-      }
-
-      if (payload.token) {
-        localStorage.setItem("studyquest_token", payload.token);
-      }
-
-      if (payload.user) {
-        localStorage.setItem("studyquest_user", JSON.stringify(payload.user));
-      }
-
-      router.push("/dashboard");
-    } catch {
-        setErrorMessage("Erro de conexão. Tente novamente.");
-    } finally {
-      setIsLoading(false);
+    if (result.status === "success") {
+      router.push(result.data.user.onboardingCompleto ? "/dashboard" : "/onboarding");
+    } else {
+      setErrorMessage(result.message);
     }
+
+    setIsLoading(false);
   }
 
   return (
-    <main className="min-h-dvh w-full bg-[#f3f2f2]">
-      <div className="grid min-h-dvh w-full overflow-hidden bg-[#f3f2f2] lg:grid-cols-[1fr_1fr]">
-        <section className="flex min-h-dvh items-center justify-center px-5 py-8 sm:px-10 sm:py-12">
-          <div className="w-full max-w-md">
-            <div className="mb-8 flex justify-end">
-              <ThemeToggle />
-            </div>
-            <h1 className="font-display text-3xl font-semibold text-slate-800 sm:text-[34px]">Entre</h1>
-            <p className="mt-4 text-base text-slate-500 sm:text-[18px]">
-              Ainda não cadastrado?{" "}
-              <a href="#" className="font-medium text-slate-700 underline underline-offset-2">
-                Cadastre-se
-              </a>
-            </p>
-
-            <form className="mt-8 space-y-6 sm:mt-10" onSubmit={handleLogin}>
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-base text-slate-600 sm:text-[18px]">
-                  E-mail:
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="exemplo@gmail.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                    className="h-12 w-full rounded-2xl border border-slate-400/60 bg-white px-4 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:h-14 sm:text-lg"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="password" className="block text-base text-slate-600 sm:text-[18px]">
-                  Digite sua senha:
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="******"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    required
-                    className="h-12 w-full rounded-2xl border border-slate-400/60 bg-white px-4 pr-12 text-base text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#974FC9]/65 sm:h-14 sm:text-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 transition hover:opacity-70"
-                  >
-                    {showPassword ? <EyeOff aria-hidden="true" size={20} /> : <Eye aria-hidden="true" size={20} />}
-                  </button>
-                </div>
-                <div className="pt-1 text-right">
-                  <a href="#" className="text-base font-medium text-slate-700 underline underline-offset-2 sm:text-lg">
-                    Esqueceu sua senha?
-                  </a>
-                </div>
-              </div>
-
-              {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:brightness-95 sm:h-14 sm:text-[24px]"
-              >
-                {isLoading ? "Entrando..." : "Continuar"}
-              </button>
-            </form>
-
-            <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
-              <SocialButton src="/images/auth/logos/facebook.png" alt="Facebook" />
-              <SocialButton src="/images/auth/logos/google.png" alt="Google" />
-              <SocialButton src="/images/auth/logos/apple.png" alt="Apple" />
-            </div>
-          </div>
-        </section>
-
-        <section className="relative hidden min-h-screen overflow-hidden lg:flex lg:flex-col lg:items-center lg:justify-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_20%,rgba(233,65,181,0.35),transparent_35%),linear-gradient(150deg,#e9e6b5_0%,#f2ae8f_48%,#bc53db_85%,#84d9ec_100%)]" />
-
-          <div className="relative z-10 flex flex-col items-center gap-8 px-8 text-center">
-            <Image
-              src="/images/auth/charathers.png"
-              alt="Grupo de personagens"
-              width={340}
-              height={250}
-              priority
-              className="h-auto w-[340px] max-w-full"
-            />
-
-            <h2 className="font-display text-4xl font-semibold leading-tight text-white xl:text-6xl">
-              Comece sua jornada de <span className="italic">aprendizado!</span>
-            </h2>
-          </div>
-
-
-        </section>
-      </div>
-    </main>
+    <AuthShell
+      eyebrow="Sua jornada continua"
+      title="Bem-vindo de volta!"
+      description={
+        <>
+          Ainda não tem uma conta?{" "}
+          <Link href="/register" className="font-medium text-slate-700 underline underline-offset-2">
+            Cadastre-se
+          </Link>
+        </>
+      }
+      footer={
+        <>
+          <span>Esqueceu sua senha?</span>{" "}
+          <Link href="/forgot-password" className="font-medium text-slate-700 underline underline-offset-2">
+            Redefinir agora
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-6" onSubmit={handleLogin}>
+        <AuthInput
+          id="email"
+          name="email"
+          type="email"
+          label="E-mail"
+          placeholder="exemplo@gmail.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          required
+        />
+        <PasswordInput
+          id="password"
+          name="password"
+          label="Senha"
+          placeholder="Digite sua senha"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+        />
+        <AuthError message={errorMessage} />
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:text-[22px]"
+        >
+          {isLoading ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
