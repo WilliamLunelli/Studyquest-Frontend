@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { OnboardingError, OnboardingLoading, OnboardingShell } from "@/components/OnboardingShell";
 import { fetchGoalWeights, saveDifficulties, type GoalWeight } from "@/lib/services/onboarding-client";
+import { generateCycle } from "@/lib/services/cycle-client";
 
 export default function DifficultiesOnboardingPage() {
   const router = useRouter();
@@ -34,7 +35,14 @@ export default function DifficultiesOnboardingPage() {
     const result = await saveDifficulties(subjects.map((subject) => ({ subjectId: subject.id, nivel: levels[subject.id] ?? 3 })));
     if (result.status === "ok") {
       sessionStorage.removeItem("studyquest_onboarding_goal");
-      router.push("/dashboard");
+      // Gerar ciclo após completar onboarding
+      const cycleResult = await generateCycle();
+      if (cycleResult.status === "ok") {
+        router.push("/dashboard");
+      } else {
+        setMessage(cycleResult.message);
+        setIsSaving(false);
+      }
     } else setMessage(result.message);
     setIsSaving(false);
   }

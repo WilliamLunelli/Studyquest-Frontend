@@ -20,7 +20,9 @@ export async function fetchPerformance(periodo: "7d" | "30d" | "90d" = "7d"): Pr
 
     if (response.status === 401) return { status: "unauthorized", message: "Sua sessão expirou." };
     if (!response.ok) return { status: "error", message: payload?.message ?? "Não foi possível carregar seu desempenho." };
-    if (!payload?.dashboard) return { status: "empty", message: "O backend ainda não enviou dados de desempenho." };
+    if (!payload?.dashboard || Object.keys(payload.dashboard).length === 0) {
+      return { status: "empty", message: "Complete o onboarding para ver seu desempenho." };
+    }
 
     return { status: "ok", data: payload.dashboard };
   } catch {

@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Home, Pencil, RefreshCw, UserCircle } from "lucide-react";
+import { ArrowLeft, CalendarDays, Home, Pencil, RefreshCw, UserCircle, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { fetchCurrentCycle, type CurrentCycle } from "@/lib/services/cycle-client";
+import { fetchCurrentCycle, generateCycle, type CurrentCycle } from "@/lib/services/cycle-client";
+import { BottomNavigation } from "@/components/BottomNavigation";
 
 export default function CyclePage() {
   const router = useRouter();
   const [cycle, setCycle] = useState<CurrentCycle | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     void fetchCurrentCycle().then((result) => {
@@ -21,6 +23,19 @@ export default function CyclePage() {
       setIsLoading(false);
     });
   }, [router]);
+
+  async function handleRegenerateCycle() {
+    setIsRegenerating(true);
+    setMessage("");
+    const result = await generateCycle();
+    if (result.status === "ok") {
+      setCycle(result.data);
+      setMessage("Ciclo regenerado com sucesso!");
+    } else {
+      setMessage(result.message);
+    }
+    setIsRegenerating(false);
+  }
 
   if (isLoading) return <CycleState title="Carregando ciclo" message="Buscando seus blocos de estudo." />;
 
@@ -57,9 +72,9 @@ export default function CyclePage() {
           <p className="mt-7 text-sm font-semibold uppercase tracking-[0.18em] text-accent">Ciclo incompleto</p>
           <h2 className="mt-3 font-display text-3xl font-semibold leading-tight">Precisamos de mais informações</h2>
           <p className="mx-auto mt-4 max-w-md text-base leading-7 text-muted">Quando seu objetivo, disponibilidade e dificuldades forem definidos, os blocos do ciclo aparecerão aqui.</p>
-          <button type="button" disabled className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-accent px-6 text-lg font-semibold text-white opacity-50 sm:w-auto sm:min-w-64">
-            Configurar ciclo
-          </button>
+          <Link href="/settings" className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 text-lg font-semibold text-white sm:w-auto sm:min-w-64">
+            <Settings aria-hidden="true" size={20} /> Configurar ciclo
+          </Link>
         </section>}
 
         {!cycle ? <section className="mt-8 space-y-4" aria-label="Blocos aguardando dados">
@@ -77,15 +92,27 @@ export default function CyclePage() {
         </section> : null}
 
         {!cycle ? <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <button type="button" disabled className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted opacity-60">
+          <Link href="/onboarding/goal" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
             <span className="text-2xl">+</span> Adicionar bloco
-          </button>
-          <button type="button" disabled className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted opacity-60">
+          </Link>
+          <Link href="/onboarding/goal" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
             <RefreshCw aria-hidden="true" size={21} /> Refazer ciclo
+          </Link>
+        </div> : <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <Link href="/settings" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
+            <span className="text-2xl">+</span> Ajustar blocos
+          </Link>
+          <button
+            type="button"
+            onClick={handleRegenerateCycle}
+            disabled={isRegenerating}
+            className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition disabled:opacity-50"
+          >
+            <RefreshCw aria-hidden="true" size={21} /> {isRegenerating ? "Regenerando..." : "Regenerar ciclo"}
           </button>
-        </div> : null}
+        </div>}
       </div>
-      <CycleNavigation />
+      <BottomNavigation />
     </main>
   );
 }
@@ -94,12 +121,4 @@ function CycleState({ title, message }: { title: string; message: string }) {
   return <main className="flex min-h-screen items-center justify-center bg-page px-5 text-foreground"><div className="w-full max-w-sm rounded-3xl border border-border bg-surface p-7 text-center"><h1 className="font-display text-2xl font-semibold">{title}</h1><p className="mt-3 text-muted">{message}</p></div></main>;
 }
 
-function CycleNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex min-h-20 items-center justify-around border-t border-border bg-surface/95 px-5 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Navegação principal">
-      <Link href="/dashboard" className="flex flex-col items-center gap-1 text-muted"><Home aria-hidden="true" size={23} /><span className="text-sm">Home</span></Link>
-      <Link href="/cycle" className="flex flex-col items-center gap-1 text-accent"><CalendarDays aria-hidden="true" size={23} /><span className="text-sm font-semibold">Ciclo</span><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" /></Link>
-      <Link href="/dashboard/analytics" className="flex flex-col items-center gap-1 text-muted"><UserCircle aria-hidden="true" size={23} /><span className="text-sm">Perfil</span></Link>
-    </nav>
-  );
-}
+

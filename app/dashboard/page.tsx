@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Home as HomeIcon, UserCircle } from "lucide-react";
+import { ArrowRight, CalendarDays, Home as HomeIcon, UserCircle, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { type HomePayload, fetchHomeClient } from "@/lib/services/home-client";
+import { BottomNavigation } from "@/components/BottomNavigation";
 
 function formatWeekday() {
   const weekday = new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date());
@@ -168,19 +169,14 @@ function EmptyHome() {
       <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-accent">Seu ciclo começa aqui</p>
       <h1 className="mt-3 font-display text-3xl font-semibold leading-tight">Ainda não há blocos para hoje.</h1>
       <p className="mx-auto mt-4 max-w-md text-base leading-7 text-muted">Quando seu ciclo de estudos estiver configurado, o próximo bloco, as revisões e sua sequência aparecerão nesta tela.</p>
+      <Link href="/settings" className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 text-lg font-semibold text-white sm:w-auto sm:min-w-64">
+        <Settings aria-hidden="true" size={20} /> Configurar ciclo
+      </Link>
     </section>
   );
 }
 
-function BottomNavigation() {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex min-h-20 items-center justify-around border-t border-border bg-surface/95 px-5 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Navegação principal">
-      <Link href="/dashboard" className="flex flex-col items-center gap-1 text-[#f21b52]"><HomeIcon aria-hidden="true" size={23} /><span className="text-sm font-semibold">Home</span><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#f21b52]" /></Link>
-      <Link href="/cycle" className="flex flex-col items-center gap-1 text-muted"><CalendarDays aria-hidden="true" size={23} /><span className="text-sm">Ciclo</span></Link>
-      <Link href="/dashboard/analytics" className="flex flex-col items-center gap-1 text-muted"><UserCircle aria-hidden="true" size={23} /><span className="text-sm">Perfil</span></Link>
-    </nav>
-  );
-}
+
 
 function HomeState({ title, message }: { title: string; message: string }) {
   return <main className="flex min-h-screen items-center justify-center bg-page px-5 text-foreground"><div className="w-full max-w-sm rounded-3xl border border-border bg-surface p-6 text-center"><h1 className="font-display text-2xl font-semibold">{title}</h1><p className="mt-2 text-muted">{message}</p></div></main>;

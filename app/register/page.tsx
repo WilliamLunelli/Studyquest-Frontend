@@ -23,7 +23,7 @@ export default function RegisterPage() {
     const result = await registerClient(name, email, password);
 
     if (result.status === "success") {
-      router.push("/login");
+      router.push("/onboarding");
     } else {
       setErrorMessage(result.message);
     }
