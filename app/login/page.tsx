@@ -45,10 +45,7 @@ export default function LoginPage() {
       }
       footer={
         <>
-          <span>Esqueceu sua senha?</span>{" "}
-          <Link href="/forgot-password" className="font-medium text-slate-700 underline underline-offset-2">
-            Redefinir agora
-          </Link>
+          <span>Recuperação de senha ainda não está disponível.</span>
         </>
       }
     >

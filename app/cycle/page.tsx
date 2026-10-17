@@ -30,7 +30,7 @@ export default function CyclePage() {
     const result = await generateCycle();
     if (result.status === "ok") {
       setCycle(result.data);
-      setMessage("Ciclo regenerado com sucesso!");
+      setMessage("");
     } else {
       setMessage(result.message);
     }
@@ -92,12 +92,17 @@ export default function CyclePage() {
         </section> : null}
 
         {!cycle ? <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href="/onboarding/goal" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
-            <span className="text-2xl">+</span> Adicionar bloco
+          <Link href="/settings" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
+            <Settings aria-hidden="true" size={21} /> Configurar ciclo
           </Link>
-          <Link href="/onboarding/goal" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
-            <RefreshCw aria-hidden="true" size={21} /> Refazer ciclo
-          </Link>
+          <button
+            type="button"
+            onClick={handleRegenerateCycle}
+            disabled={isRegenerating}
+            className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition disabled:opacity-50"
+          >
+            <RefreshCw aria-hidden="true" size={21} /> {isRegenerating ? "Gerando ciclo..." : "Gerar ciclo"}
+          </button>
         </div> : <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link href="/settings" className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full border border-border bg-surface px-5 text-lg font-semibold text-muted hover:border-accent hover:text-accent transition">
             <span className="text-2xl">+</span> Ajustar blocos

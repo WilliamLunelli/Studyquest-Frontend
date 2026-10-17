@@ -1,8 +1,15 @@
 import { getAuthHeader } from "@/lib/api-config";
+import { getCurrentUser } from "@/lib/jwt-auth";
 
 export type Goal = { id: string; tipo: string; nome: string; instituicao: string | null };
 export type GoalWeight = { areaId: string; area: string; peso: number; subjects: Array<{ id: string; nome: string }> };
 export type AvailabilityDay = { diaSemana: number; minutos: number };
+export const AVAILABILITY_STORAGE_KEY = "studyquest_availability";
+
+export function getAvailabilityStorageKey() {
+  const userId = getCurrentUser()?.id;
+  return userId ? `${AVAILABILITY_STORAGE_KEY}:${userId}` : null;
+}
 
 type ClientResult<T = null> = { status: "ok"; data: T } | { status: "unauthorized" | "error"; message: string };
 
@@ -31,7 +38,17 @@ export function saveOnboardingGoal(goalId: string) {
 }
 
 export function saveAvailability(disponibilidade: AvailabilityDay[]) {
-  return request("/api/onboarding/availability", { method: "PUT", body: JSON.stringify({ disponibilidade }) });
+  return request("/api/onboarding/availability", { method: "PUT", body: JSON.stringify({ disponibilidade }) }).then((result) => {
+    const storageKey = getAvailabilityStorageKey();
+    if (result.status === "ok" && storageKey && typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(disponibilidade));
+      } catch {
+        // A persistência no backend continua válida se o navegador bloquear o localStorage.
+      }
+    }
+    return result;
+  });
 }
 
 export function saveDifficulties(dificuldades: Array<{ subjectId: string; nivel: number }>) {

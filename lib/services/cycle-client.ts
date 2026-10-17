@@ -1,4 +1,4 @@
-import { API_CONFIG, buildApiUrl, getAuthHeader } from "@/lib/api-config";
+import { API_CONFIG, getAuthHeader } from "@/lib/api-config";
 
 export type CycleBlock = { id: string; ordem: number; subjectId: string; materia: string; topicId: string | null; assunto: string | null; duracaoMin: number; status: "pendente" | "concluido" };
 export type CurrentCycle = { id: string; geradoEm: string; posicaoAtual: number; blocos: CycleBlock[] };
@@ -20,8 +20,9 @@ export async function fetchCurrentCycle(): Promise<CycleResult> {
 
 export async function generateCycle(): Promise<CycleResult> {
   try {
-    const response = await fetch(buildApiUrl(API_CONFIG.endpoints.cycles + "/generate"), {
+    const response = await fetch("/api/cycles", {
       method: "POST",
+      credentials: "include",
       headers: { ...API_CONFIG.headers, ...getAuthHeader() },
     });
     const payload = (await response.json().catch(() => null)) as CurrentCycle | { message?: string } | null;

@@ -11,15 +11,19 @@ import {
   fetchGoalWeights,
   saveDifficulties,
   saveAvailability,
+  getAvailabilityStorageKey,
   type Goal,
   type GoalWeight,
   type AvailabilityDay,
 } from "@/lib/services/onboarding-client";
 import { BottomNavigation } from "@/components/BottomNavigation";
+import { getAuthHeader } from "@/lib/api-config";
+import { generateCycle } from "@/lib/services/cycle-client";
 
 const weekdays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 type Step = "goal" | "availability" | "difficulties";
+type AvailabilitySource = "saved" | "suggested" | "unavailable";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -27,6 +31,7 @@ export default function SettingsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [selectedGoal, setSelectedGoal] = useState("");
   const [minutes, setMinutes] = useState<number[]>(Array(7).fill(0));
+  const [availabilitySource, setAvailabilitySource] = useState<AvailabilitySource>("unavailable");
   const [weights, setWeights] = useState<GoalWeight[]>([]);
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [message, setMessage] = useState("");
@@ -47,28 +52,49 @@ export default function SettingsPage() {
     }
   }, [step]);
 
-  useEffect(() => {
-    if (step === "difficulties" && selectedGoal) {
-      void fetchGoalWeights(selectedGoal).then((result) => {
-        if (result.status === "ok") setWeights(result.data);
-        else setMessage(result.message);
-      });
-    }
-  }, [step, selectedGoal]);
-
   async function fetchAvailability() {
+    const storageKey = getAvailabilityStorageKey();
+    let savedAvailability: string | null = null;
+    try {
+      savedAvailability = storageKey ? window.localStorage.getItem(storageKey) : null;
+    } catch {
+      setAvailabilitySource("unavailable");
+    }
+    if (savedAvailability) {
+      try {
+        const parsed = JSON.parse(savedAvailability) as AvailabilityDay[];
+        const hasSevenUniqueDays = new Set(parsed.map((day) => day.diaSemana)).size === 7;
+        if (parsed.length === 7 && hasSevenUniqueDays && parsed.every((day) => Number.isInteger(day.diaSemana) && day.diaSemana >= 0 && day.diaSemana <= 6 && Number.isInteger(day.minutos) && day.minutos >= 0 && day.minutos <= 960)) {
+          const savedMinutes = Array<number>(7).fill(0);
+          parsed.forEach((day) => { savedMinutes[day.diaSemana] = day.minutos; });
+          setMinutes(savedMinutes);
+          setAvailabilitySource("saved");
+          return;
+        }
+      } catch {
+        if (storageKey) window.localStorage.removeItem(storageKey);
+      }
+    }
+
     try {
       const response = await fetch("/api/home", {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        cache: "no-store",
       });
       const payload = await response.json().catch(() => null);
-      if (payload?.streak?.metaDiariaMin) {
+      if (!response.ok) {
+        setAvailabilitySource("unavailable");
+        return;
+      }
+      if (typeof payload?.streak?.metaDiariaMin === "number" && payload.streak.metaDiariaMin > 0) {
         const defaultMin = Math.round(payload.streak.metaDiariaMin / 7) || 60;
         setMinutes(Array(7).fill(defaultMin));
+        setAvailabilitySource("suggested");
+      } else {
+        setAvailabilitySource("unavailable");
       }
     } catch {
-      setMinutes(Array(7).fill(60));
+      setAvailabilitySource("unavailable");
     }
   }
 
@@ -78,10 +104,17 @@ export default function SettingsPage() {
     setMessage("");
     const result = await saveOnboardingGoal(selectedGoal);
     if (result.status === "ok") {
+      const weightsResult = await fetchGoalWeights(selectedGoal);
+      if (weightsResult.status !== "ok") {
+        setMessage(weightsResult.message);
+        setIsSaving(false);
+        return;
+      }
+
+      setWeights(weightsResult.data);
       const goal = goals.find((g) => g.id === selectedGoal);
       sessionStorage.setItem("studyquest_onboarding_goal", JSON.stringify({ id: selectedGoal, nome: goal?.nome ?? "" }));
       setStep("availability");
-      await fetchAvailability();
     } else setMessage(result.message);
     setIsSaving(false);
   }
@@ -109,9 +142,13 @@ export default function SettingsPage() {
       subjects.map((s) => ({ subjectId: s.id, nivel: levels[s.id] ?? 3 }))
     );
     if (result.status === "ok") {
-      sessionStorage.removeItem("studyquest_onboarding_goal");
-      setMessage("Configurações salvas. Use 'Regenerar ciclo' no Ciclo para aplicar.");
-      setTimeout(() => router.push("/dashboard"), 1500);
+      const cycleResult = await generateCycle();
+      if (cycleResult.status === "ok") {
+        sessionStorage.removeItem("studyquest_onboarding_goal");
+        router.push("/dashboard");
+      } else {
+        setMessage(`Configurações salvas, mas não foi possível gerar o ciclo: ${cycleResult.message}`);
+      }
     } else setMessage(result.message);
     setIsSaving(false);
   }
@@ -207,6 +244,13 @@ export default function SettingsPage() {
 
           {step === "availability" && (
             <div className="mt-8 space-y-3">
+              <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                {availabilitySource === "saved"
+                  ? "Mostrando a última disponibilidade salva neste navegador."
+                  : availabilitySource === "suggested"
+                    ? "Estes valores são uma sugestão distribuída igualmente pela semana, não os valores salvos. O backend atual não oferece uma consulta da disponibilidade diária. Ajuste-os antes de salvar."
+                    : "O backend atual não oferece uma consulta da disponibilidade diária. Informe os minutos de cada dia antes de salvar."}
+              </p>
               {weekdays.map((day, index) => (
                 <label key={day} className="flex items-center justify-between gap-4 rounded-3xl border border-border bg-surface p-4">
                   <span className="font-semibold">{day}</span>
