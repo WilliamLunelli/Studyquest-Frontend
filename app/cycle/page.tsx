@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Home, Pencil, RefreshCw, UserCircle, Settings } from "lucide-react";
+import { ArrowLeft, CalendarDays, Pencil, RefreshCw, Settings, Check, X, ChevronUp, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { fetchCurrentCycle, generateCycle, type CurrentCycle } from "@/lib/services/cycle-client";
+import { declareTopicMastered, fetchCurrentCycle, generateCycle, type CycleBlock, type CurrentCycle, updateCycleBlock } from "@/lib/services/cycle-client";
 import { BottomNavigation } from "@/components/BottomNavigation";
 
 export default function CyclePage() {
@@ -14,6 +14,12 @@ export default function CyclePage() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<CycleBlock | null>(null);
+  const [durationDraft, setDurationDraft] = useState("25");
+  const [masteredBlocks, setMasteredBlocks] = useState<CycleBlock[]>([]);
+  const [confirmMastery, setConfirmMastery] = useState<CycleBlock | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     void fetchCurrentCycle().then((result) => {
@@ -37,6 +43,31 @@ export default function CyclePage() {
     setIsRegenerating(false);
   }
 
+  async function saveBlock(block: CycleBlock, changes: { duracaoMin?: number; ordem?: number }) {
+    setIsSaving(true);
+    const result = await updateCycleBlock(block.id, changes);
+    if (result.status !== "ok") setMessage(result.message);
+    else {
+      const refreshed = await fetchCurrentCycle();
+      if (refreshed.status === "ok") setCycle(refreshed.data);
+      setEditingBlock(null);
+      setMessage("");
+    }
+    setIsSaving(false);
+  }
+
+  async function handleDeclareMastered() {
+    if (!confirmMastery) return;
+    setIsSaving(true);
+    const result = await declareTopicMastered(confirmMastery.id);
+    if (result.status === "ok") {
+      setMasteredBlocks((current) => [...current.filter((item) => item.topicId !== result.data.bloco?.topicId), result.data.bloco!]);
+      setConfirmMastery(null);
+      setMessage(`Assunto declarado como dominado. ${result.data.xpGanho ? `+${result.data.xpGanho} XP.` : ""}`);
+    } else setMessage(result.message);
+    setIsSaving(false);
+  }
+
   if (isLoading) return <CycleState title="Carregando ciclo" message="Buscando seus blocos de estudo." />;
 
   return (
@@ -52,8 +83,8 @@ export default function CyclePage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button type="button" disabled aria-label="Editar ciclo" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface text-muted opacity-60">
-              <Pencil aria-hidden="true" size={25} />
+            <button type="button" onClick={() => setEditMode((value) => !value)} aria-label={editMode ? "Concluir edição do ciclo" : "Editar ciclo"} className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface transition hover:border-accent hover:text-accent ${editMode ? "text-accent" : "text-muted"}`}>
+              {editMode ? <Check aria-hidden="true" size={25} /> : <Pencil aria-hidden="true" size={25} />}
             </button>
           </div>
         </header>
@@ -64,7 +95,11 @@ export default function CyclePage() {
 
         {cycle ? <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8">
           <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent">Ciclo atual</p><h2 className="mt-2 font-display text-3xl font-semibold">Bloco {cycle.posicaoAtual + 1} de {cycle.blocos.length}</h2></div><span className="rounded-full bg-accent-soft px-4 py-2 text-sm font-semibold text-accent">{cycle.blocos.filter((block) => block.status === "concluido").length} concluídos</span></div>
-          <div className="mt-7 space-y-3">{cycle.blocos.map((block) => <Link key={block.id} href={`/session?blockId=${encodeURIComponent(block.id)}&subject=${encodeURIComponent(block.materia)}${block.assunto ? `&topic=${encodeURIComponent(block.assunto)}` : ""}`} className={`flex items-center justify-between gap-4 rounded-3xl border p-5 transition hover:border-accent ${block.ordem === cycle.posicaoAtual + 1 ? "border-accent bg-accent-soft" : "border-border bg-surface"}`}><div><p className="text-sm font-semibold text-muted">Bloco {block.ordem}</p><h3 className="mt-1 font-display text-xl font-semibold">{block.materia}{block.assunto ? ` - ${block.assunto}` : ""}</h3></div><span className="shrink-0 text-base font-semibold text-muted">{block.duracaoMin} min</span></Link>)}</div>
+          <div className="mt-7 space-y-3">{cycle.blocos.map((block) => <article key={block.id} className={`rounded-3xl border p-5 ${block.ordem === cycle.posicaoAtual + 1 ? "border-accent bg-accent-soft" : "border-border bg-surface"}`}>
+            {editingBlock?.id === block.id ? <div className="flex flex-wrap items-end gap-3"><label className="flex-1 text-sm font-semibold text-muted">Duração (25–60 min)<input type="number" min={25} max={60} value={durationDraft} onChange={(event) => setDurationDraft(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-page px-3 text-foreground" /></label><button type="button" disabled={isSaving} onClick={() => void saveBlock(block, { duracaoMin: Number(durationDraft) })} className="min-h-12 rounded-xl bg-accent px-5 font-semibold text-white disabled:opacity-50">Salvar</button><button type="button" onClick={() => setEditingBlock(null)} aria-label="Cancelar edição" className="min-h-12 rounded-xl border border-border px-3"><X size={19} /></button></div> : <div className="flex flex-wrap items-center justify-between gap-4"><Link href={`/session?blockId=${encodeURIComponent(block.id)}&subject=${encodeURIComponent(block.materia)}${block.assunto ? `&topic=${encodeURIComponent(block.assunto)}` : ""}`} className="min-w-0 flex-1"><p className="text-sm font-semibold text-muted">Bloco {block.ordem}</p><h3 className="mt-1 font-display text-xl font-semibold">{block.materia}{block.assunto ? ` - ${block.assunto}` : ""}</h3><span className="mt-2 inline-block text-base font-semibold text-muted">{block.duracaoMin} min</span></Link>
+              {editMode ? <div className="flex items-center gap-2"><button type="button" disabled={block.ordem <= 1 || isSaving} aria-label={`Mover bloco ${block.ordem} para cima`} onClick={() => void saveBlock(block, { ordem: block.ordem - 1 })} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border disabled:opacity-40"><ChevronUp size={20}/></button><button type="button" disabled={block.ordem >= cycle.blocos.length || isSaving} aria-label={`Mover bloco ${block.ordem} para baixo`} onClick={() => void saveBlock(block, { ordem: block.ordem + 1 })} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border disabled:opacity-40"><ChevronDown size={20}/></button><button type="button" disabled={!block.topicId} onClick={() => setConfirmMastery(block)} className="min-h-11 rounded-xl border border-border px-3 text-sm font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-40">Dominado</button><button type="button" onClick={() => { setEditingBlock(block); setDurationDraft(String(block.duracaoMin)); }} aria-label={`Editar duração do bloco ${block.ordem}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border"><Pencil size={18}/></button></div> : null}</div>}
+          </article>)}</div>
+          {masteredBlocks.length ? <section className="mt-8 border-t border-border pt-6"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-accent">Dominados · fora de novos ciclos</p><div className="mt-3 space-y-2">{masteredBlocks.map((block) => <article key={block.id} className="rounded-2xl bg-accent-soft p-4 font-semibold">{block.materia}{block.assunto ? ` · ${block.assunto}` : ""}</article>)}</div></section> : null}
         </section> : <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 text-center sm:p-10">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-accent">
             <CalendarDays aria-hidden="true" size={38} strokeWidth={1.7} />
@@ -117,6 +152,7 @@ export default function CyclePage() {
           </button>
         </div>}
       </div>
+      {confirmMastery ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="mastery-title" className="w-full max-w-md rounded-3xl border border-border bg-surface p-7"><h2 id="mastery-title" className="font-display text-2xl font-semibold">Declarar assunto dominado?</h2><p className="mt-4 leading-7 text-muted">{confirmMastery.assunto} será excluído de novos ciclos e você receberá o bônus de domínio previsto pelo sistema. O bloco já gerado permanece neste ciclo atual. Essa ação não pode ser desfeita.</p><div className="mt-6 flex gap-3"><button type="button" disabled={isSaving} onClick={() => void handleDeclareMastered()} className="min-h-12 flex-1 rounded-full bg-accent px-4 font-semibold text-white disabled:opacity-50">Confirmar domínio</button><button type="button" onClick={() => setConfirmMastery(null)} className="min-h-12 flex-1 rounded-full border border-border px-4 font-semibold">Cancelar</button></div></section></div> : null}
       <BottomNavigation />
     </main>
   );

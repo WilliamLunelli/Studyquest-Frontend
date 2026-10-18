@@ -21,7 +21,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<ClientResul
     if (!response.ok) return { status: "error", message: payload?.message ?? "Não foi possível salvar esta etapa." };
     return { status: "ok", data: payload as T };
   } catch {
-    return { status: "error", message: "Não foi possível conectar ao backend." };
+    return { status: "error", message: "Não foi possível conectar agora. Verifique sua conexão e tente novamente." };
   }
 }
 

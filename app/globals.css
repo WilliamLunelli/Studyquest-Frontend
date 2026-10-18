@@ -137,3 +137,17 @@ html.theme-switching *::after {
   background-image: radial-gradient(circle at 1px 1px, rgba(151, 79, 201, 0.18) 1px, transparent 0);
   background-size: 24px 24px;
 }
+
+.auth-art-gradient {
+  background:
+    radial-gradient(ellipse at 0% 100%, rgba(242, 174, 143, 0.92) 0%, rgba(242, 174, 143, 0) 58%),
+    radial-gradient(ellipse at 100% 100%, rgba(151, 79, 201, 0.88) 0%, rgba(151, 79, 201, 0) 58%),
+    linear-gradient(180deg, transparent 0%, rgba(238, 101, 178, 0.82) 62%, #974fc9 100%);
+}
+
+.dark .auth-art-gradient {
+  background:
+    radial-gradient(ellipse at 0% 100%, rgba(242, 174, 143, 0.72) 0%, rgba(242, 174, 143, 0) 58%),
+    radial-gradient(ellipse at 100% 100%, rgba(151, 79, 201, 0.78) 0%, rgba(151, 79, 201, 0) 58%),
+    linear-gradient(180deg, transparent 0%, rgba(193, 82, 166, 0.76) 62%, #5b2b78 100%);
+}

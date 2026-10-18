@@ -22,17 +22,19 @@ export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [period, setPeriod] = useState<"7d" | "30d" | "90d">("7d");
 
   useEffect(() => {
-    void fetchPerformance().then((result) => {
+    setIsLoading(true);
+    void fetchPerformance(period).then((result) => {
       if (result.status === "ok") setMetrics(result.data);
-      else setMessage(result.message);
+      else { setMetrics(null); setMessage(result.message); }
       setIsLoading(false);
     });
-  }, []);
+  }, [period]);
 
-  if (isLoading) return <AnalyticsState title="Carregando desempenho" message="Buscando seus dados dos últimos 7 dias." />;
-  if (!metrics) return <AnalyticsState title="Dados aguardando o backend" message={message || "As métricas aparecerão aqui quando o backend enviar os dados."} />;
+  if (isLoading && !metrics) return <AnalyticsState title="Carregando desempenho" message={`Buscando seus dados dos últimos ${period === "7d" ? "7" : period === "30d" ? "30" : "90"} dias.`} />;
+  if (!metrics) return <AnalyticsState title="Desempenho indisponível" message={message || "Registre atividades de estudo para acompanhar seus indicadores."} />;
 
   const totalStudied = metrics.horasPorMateria.reduce((sum, item) => sum + item.minutosReaisSemana, 0);
   const totalTarget = metrics.horasPorMateria.reduce((sum, item) => sum + item.minutosIdeaisSemana, 0);
@@ -50,7 +52,11 @@ export default function AnalyticsPage() {
 
         <div className="mt-8 flex items-end justify-between gap-4">
           <h1 className="font-display text-2xl font-medium sm:text-3xl">Seu desempenho</h1>
-          <span className="text-xl text-muted">últimos 7</span>
+          <label className="flex items-center gap-2 text-sm font-semibold text-muted">Período
+            <select aria-label="Período do desempenho" value={period} onChange={(event) => setPeriod(event.target.value as "7d" | "30d" | "90d")} className="min-h-11 rounded-xl border border-border bg-surface px-3 text-foreground">
+              <option value="7d">7 dias</option><option value="30d">30 dias</option><option value="90d">90 dias</option>
+            </select>
+          </label>
         </div>
 
         <section className="mt-5 grid grid-cols-1 gap-6 rounded-[2rem] border border-border bg-surface px-7 py-8 sm:grid-cols-3 sm:gap-4">
@@ -59,6 +65,12 @@ export default function AnalyticsPage() {
           <Metric label="em questões" value={accuracy === null ? "--" : `${accuracy}%`} detail="Acertos em questões" />
         </section>
 
+        <section className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Cobertura e recordes">
+          <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Cobertura do catálogo</p><p className="mt-2 font-display text-2xl font-semibold">{metrics.cobertura.percentual}%</p><p className="mt-1 text-sm text-muted">{metrics.cobertura.assuntosVistos} de {metrics.cobertura.assuntosTotais} assuntos</p></article>
+          <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Recorde de sequência</p><p className="mt-2 font-display text-2xl font-semibold">{metrics.streak.recorde} dias</p></article>
+          <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Escudos disponíveis</p><p className="mt-2 font-display text-2xl font-semibold">{metrics.streak.escudosDisponiveis}</p></article>
+          <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Aderência ao ciclo</p><p className="mt-2 font-display text-2xl font-semibold">{metrics.aderenciaCiclo.percentual}%</p><p className="mt-1 text-sm text-muted">{metrics.aderenciaCiclo.blocosConcluidos} de {metrics.aderenciaCiclo.blocosPlanejados} blocos</p></article>
+        </section>
         <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8">
           <h2 className="font-display text-2xl font-semibold">Peso na prova vs. horas estudadas</h2>
           <div className="mt-8 space-y-8">
@@ -80,6 +92,11 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8">
+          <h2 className="font-display text-2xl font-semibold">Acertos por assunto</h2>
+          {metrics.acertoPorAssunto.length ? <div className="mt-5 divide-y divide-border">{metrics.acertoPorAssunto.map((item) => <div key={item.topicId} className="flex items-center justify-between gap-4 py-4"><div><p className="font-semibold">{item.assunto}</p><p className="mt-1 text-sm text-muted">{item.materia} · {item.acertadas}/{item.feitas} questões</p></div><span className="rounded-full bg-accent-soft px-4 py-2 font-semibold text-accent">{item.percentual}%</span></div>)}</div> : <p className="mt-4 text-muted">Registre questões para acompanhar seu acerto por assunto.</p>}
         </section>
 
         {confidence ? <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8">

@@ -21,6 +21,7 @@ export const API_CONFIG = {
     onboardingDifficulties: "/me/difficulties",
     cycles: "/cycles",
     reviews: "/reviews",
+    questionLogs: "/question-logs",
 
     // Timed study sessions
     sessions: "/sessions",

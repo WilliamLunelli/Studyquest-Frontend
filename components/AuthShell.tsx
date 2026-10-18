@@ -43,7 +43,7 @@ export function AuthShell({ eyebrow, title, description, children, footer, backH
           </div>
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[410px] lg:hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,#f2ae8f_24%,#ee65b2_62%,#974fc9_100%)] dark:bg-[linear-gradient(180deg,transparent_0%,#5c382d_24%,#a33f70_62%,#5b2b78_100%)]" />
+            <div className="auth-art-gradient absolute inset-0" />
             <Image
               src="/images/auth/charathers.png"
               alt="Personagens do StudyQuest"
@@ -59,7 +59,7 @@ export function AuthShell({ eyebrow, title, description, children, footer, backH
         </section>
 
         <section className="relative hidden min-h-screen overflow-hidden lg:flex lg:flex-col lg:items-start lg:justify-end">
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,#e9e6b5_0%,#f2ae8f_42%,#ee65b2_72%,#974fc9_100%)] dark:bg-[linear-gradient(180deg,#49351e_0%,#5c382d_42%,#a33f70_72%,#5b2b78_100%)]" />
+          <div className="auth-art-gradient absolute inset-x-0 bottom-0 h-[58%]" />
           <div className="relative z-10 flex w-full flex-col items-start gap-8 px-8 pb-14 text-left">
             <Image
               src="/images/auth/charathers.png"

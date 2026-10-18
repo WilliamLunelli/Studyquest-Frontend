@@ -38,7 +38,7 @@ export default function LoginPage() {
       description={
         <>
           Ainda não tem uma conta?{" "}
-          <Link href="/register" className="font-medium text-slate-700 underline underline-offset-2">
+          <Link href="/register" className="font-medium text-accent underline underline-offset-2">
             Cadastre-se
           </Link>
         </>
@@ -75,7 +75,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:text-[22px]"
+          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-accent text-lg font-semibold text-white transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:text-[22px]"
         >
           {isLoading ? "Entrando..." : "Entrar"}
         </button>

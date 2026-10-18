@@ -2,20 +2,24 @@
 
 import Link from "next/link";
 import { ArrowLeft, Check, Lightbulb } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { fetchHomeClient } from "@/lib/services/home-client";
 import { fetchReviewDetail, type ReviewDetail } from "@/lib/services/reviews-client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { fetchCurrentCycle } from "@/lib/services/cycle-client";
 
 function ReviewPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const reviewId = searchParams.get("reviewId");
   const [review, setReview] = useState<ReviewDetail | null>(null);
   const [remembered, setRemembered] = useState<number[]>([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [streak, setStreak] = useState(0);
+  const [phase, setPhase] = useState<"recall" | "ready">("recall");
+  const [topicIds, setTopicIds] = useState<{ subjectId: string; topicId: string } | null>(null);
 
   useEffect(() => {
     if (!reviewId) {
@@ -35,6 +39,15 @@ function ReviewPageContent() {
       if (result.status === "ok") setStreak(result.data.streak.atual);
     });
   }, []);
+
+  useEffect(() => {
+    if (!review) return;
+    void fetchCurrentCycle().then((result) => {
+      if (result.status !== "ok") return;
+      const block = result.data.blocos.find((item) => item.materia === review.materia && item.assunto === review.assunto && item.topicId);
+      if (block?.topicId) setTopicIds({ subjectId: block.subjectId, topicId: block.topicId });
+    });
+  }, [review]);
 
   function toggleRemembered(index: number) {
     setRemembered((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index]);
@@ -66,7 +79,7 @@ function ReviewPageContent() {
             <span className="text-base font-semibold text-muted">Revisão ativa</span>
           </div>
           <h2 className="mt-7 font-display text-3xl font-semibold leading-tight sm:text-4xl">{review.materia} - {review.assunto}</h2>
-          <p className="mt-5 text-xl leading-8 text-muted">{review.roteiro.prompts.length} perguntas para testar a fixação do conteúdo antes de abrir o material.</p>
+          <p className="mt-5 text-xl leading-8 text-muted">{review.roteiro.prompts.length} perguntas para responder de memória antes de consultar seu material.</p>
         </section>
 
         <aside className="mt-8 rounded-[2rem] border border-border bg-surface-muted p-7 sm:p-8">
@@ -74,10 +87,10 @@ function ReviewPageContent() {
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent text-white"><Lightbulb aria-hidden="true" size={31} /></span>
             <h2 className="font-display text-2xl font-semibold sm:text-3xl">Lembre-se antes de abrir</h2>
           </div>
-          <p className="mt-5 text-xl leading-8 text-muted">Tente lembrar dos estudos é o que faz você aprender, errar faz parte do aprendizado.</p>
+          <p className="mt-5 text-xl leading-8 text-muted">{phase === "recall" ? "Tente lembrar sem consultar o material. Errar faz parte do aprendizado." : `${remembered.length} de ${review.roteiro.prompts.length} respostas marcadas como lembradas. Consulte seu material e então registre a revisão.`}</p>
         </aside>
 
-        <section className="mt-8 space-y-5" aria-label="Perguntas de revisão">
+        {phase === "recall" ? <section className="mt-8 space-y-5" aria-label="Perguntas de revisão">
           {review.roteiro.prompts.map((prompt, index) => {
             const isRemembered = remembered.includes(index);
             return (
@@ -92,13 +105,13 @@ function ReviewPageContent() {
               </article>
             );
           })}
-        </section>
+        </section> : <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8"><h2 className="font-display text-2xl font-semibold">Confira seu material</h2><p className="mt-4 text-lg leading-8 text-muted">O roteiro recebido do backend traz as perguntas, mas não inclui respostas ou conteúdo de apoio. Consulte seu material e depois registre a revisão para atualizar a próxima data.</p></section>}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-page/95 px-5 pb-5 pt-4 backdrop-blur sm:px-6">
         <div className="mx-auto flex w-full max-w-2xl gap-3">
           <Link href="/dashboard" className="hidden min-h-16 items-center justify-center rounded-full border border-border bg-surface px-6 text-lg font-semibold text-foreground sm:inline-flex">Voltar</Link>
-          <Link href="/dashboard" className="inline-flex min-h-16 flex-1 items-center justify-center rounded-full bg-accent px-5 text-xl font-semibold text-white transition hover:brightness-95">Conferir respostas</Link>
+          {phase === "recall" ? <button type="button" onClick={() => setPhase("ready")} className="inline-flex min-h-16 flex-1 items-center justify-center rounded-full bg-accent px-5 text-xl font-semibold text-white transition hover:brightness-95">Agora sim, conferir material</button> : <div className="flex-1"><button type="button" disabled={!topicIds} onClick={() => topicIds && router.push(`/session?subjectId=${encodeURIComponent(topicIds.subjectId)}&topicId=${encodeURIComponent(topicIds.topicId)}&subject=${encodeURIComponent(review.materia)}&topic=${encodeURIComponent(review.assunto)}&sessionType=REVISAO&reviewId=${encodeURIComponent(review.reviewId)}`)} className="inline-flex min-h-16 w-full items-center justify-center rounded-full bg-accent px-5 text-xl font-semibold text-white transition hover:brightness-95 disabled:opacity-50">Registrar revisão</button>{!topicIds ? <p className="mt-2 text-xs text-muted">Não localizei este assunto no ciclo atual, necessário para iniciar a sessão de revisão.</p> : null}</div>}
         </div>
       </div>
     </main>

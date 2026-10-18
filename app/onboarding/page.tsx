@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 export default function OnboardingPage() {
-  redirect("/onboarding/goal");
+  return <OnboardingWizard />;
 }

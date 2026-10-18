@@ -9,6 +9,18 @@ export type PerformanceMetrics = {
   aderenciaCiclo: { blocosPlanejados: number; blocosConcluidos: number; percentual: number };
 };
 
+export async function createQuestionLog(input: { subjectId: string; topicId: string; feitas: number; acertadas: number; sessionId?: string }) {
+  try {
+    const response = await fetch("/api/question-logs", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(input),
+    });
+    const payload = await response.json().catch(() => null) as { message?: string; percentualAcerto?: number; xpGanho?: number } | null;
+    if (response.status === 401) return { status: "unauthorized" as const, message: "Sua sessão expirou." };
+    if (!response.ok) return { status: "error" as const, message: payload?.message ?? "Não foi possível registrar as questões." };
+    return { status: "ok" as const, data: payload };
+  } catch { return { status: "error" as const, message: "Não foi possível registrar as questões. Verifique sua conexão e tente novamente." }; }
+}
+
 type PerformanceResult =
   | { status: "ok"; data: PerformanceMetrics }
   | { status: "unauthorized" | "empty" | "error"; message: string };
@@ -26,6 +38,6 @@ export async function fetchPerformance(periodo: "7d" | "30d" | "90d" = "7d"): Pr
 
     return { status: "ok", data: payload.dashboard };
   } catch {
-    return { status: "error", message: "Não foi possível conectar ao backend." };
+    return { status: "error", message: "Não foi possível carregar seus indicadores. Verifique sua conexão e tente novamente." };
   }
 }

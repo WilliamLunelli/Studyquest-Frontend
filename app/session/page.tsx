@@ -11,12 +11,14 @@ import {
   createSession,
   finishSession,
   getActiveSession,
+  normalizeSession,
   pauseSession,
   resumeSession,
   type SelfAssessment,
   type SessionPreset,
   type SessionType,
 } from "@/lib/services/sessions-client";
+import { createQuestionLog } from "@/lib/services/performance-client";
 
 const presets: Array<{ value: SessionPreset; label: string; duration?: 25 | 50 }> = [
   { value: "P25_5", label: "25 / 5", duration: 25 },
@@ -36,10 +38,11 @@ function SessionPageContent() {
   const blockId = searchParams.get("blockId") ?? "";
   const subjectId = searchParams.get("subjectId") ?? "";
   const topicId = searchParams.get("topicId") ?? "";
+  const reviewId = searchParams.get("reviewId") ?? "";
   const subjectName = searchParams.get("subject") ?? "Sessão de estudo";
   const topicName = searchParams.get("topic") ?? "Assunto selecionado";
   const [session, setSession] = useState<ActiveSession | null>(null);
-  const [sessionType, setSessionType] = useState<SessionType>("TEORIA");
+  const [sessionType, setSessionType] = useState<SessionType>(searchParams.get("sessionType") === "REVISAO" ? "REVISAO" : "TEORIA");
   const [preset, setPreset] = useState<SessionPreset>("P50_10");
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
@@ -50,6 +53,9 @@ function SessionPageContent() {
   const [finished, setFinished] = useState<{ xp: number; minutes: number } | null>(null);
   const [resolvedSubjectId, setResolvedSubjectId] = useState(subjectId);
   const [resolvedTopicId, setResolvedTopicId] = useState(topicId);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [questionsDone, setQuestionsDone] = useState("");
+  const [questionsCorrect, setQuestionsCorrect] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +65,7 @@ function SessionPageContent() {
         router.push("/login");
       } else if (result.status === "ok") {
         setSession(result.data);
+        if (result.data) setShowRecovery(true);
       } else {
         setMessage(result.message);
       }
@@ -88,9 +95,12 @@ function SessionPageContent() {
 
   const displayedSeconds = useMemo(() => {
     if (!session) return 0;
-    const accumulated = session.minutosAcumulados * 60;
+    const accumulatedMinutes = Number(session.minutosAcumulados);
+    const accumulated = (Number.isFinite(accumulatedMinutes) ? Math.max(0, accumulatedMinutes) : 0) * 60;
     if (session.status !== "RUNNING" || !session.resumedAt) return accumulated;
-    return accumulated + Math.max(0, Math.floor((elapsedNow - Date.parse(session.resumedAt)) / 1000));
+    const resumedAt = Date.parse(session.resumedAt);
+    if (!Number.isFinite(resumedAt)) return accumulated;
+    return accumulated + Math.max(0, Math.floor((elapsedNow - resumedAt) / 1000));
   }, [elapsedNow, session]);
 
   const selectedPreset = presets.find((item) => item.value === preset) ?? presets[1];
@@ -114,6 +124,7 @@ function SessionPageContent() {
       tipo: sessionType,
       preset,
       ...(selectedPreset.duration ? { duracaoAlvoMin: selectedPreset.duration } : {}),
+      ...(reviewId ? { reviewId } : {}),
     };
     const result = await createSession(input);
     if (result.status === "ok") setSession({ ...result.data, resumedAt: result.data.startedAt });
@@ -127,23 +138,41 @@ function SessionPageContent() {
     setMessage("");
     const result = await action();
     if (result.status === "ok") {
-      setSession({
-        ...result.data,
-        resumedAt: result.data.status === "RUNNING" ? new Date().toISOString() : null,
-      });
+      const normalized = normalizeSession(result.data, session);
+      setSession({ ...normalized, resumedAt: normalized.status === "RUNNING" ? new Date().toISOString() : null });
     }
     else setMessage(result.message);
     setIsBusy(false);
   }
 
+  async function handleLeaveSession() {
+    if (session?.status === "RUNNING") {
+      const paused = await pauseSession(session.id);
+      if (paused.status !== "ok") { setMessage(paused.message); return; }
+    }
+    router.push("/dashboard");
+  }
+
   async function handleFinish() {
     if (!session || !assessment) return;
+    if (session.type === "REVISAO" && displayedSeconds < 5 * 60) {
+      setMessage("Complete pelo menos 5 minutos para registrar a revisão e atualizar o próximo intervalo.");
+      return;
+    }
+    if (session.type === "QUESTOES" && questionsDone && (!Number.isInteger(Number(questionsDone)) || Number(questionsDone) < 1 || Number(questionsDone) > 500 || Number(questionsCorrect || 0) < 0 || Number(questionsCorrect || 0) > Number(questionsDone))) {
+      setMessage("Informe de 1 a 500 questões e um número de acertos entre zero e o total feito.");
+      return;
+    }
     setIsBusy(true);
     setMessage("");
     const result = await finishSession(session.id, assessment, note);
     if (result.status === "ok") {
       setFinished({ xp: result.data.xp.ganho, minutes: result.data.sessao.minutosTotais });
       setSession(null);
+      if (session.type === "QUESTOES" && resolvedSubjectId && resolvedTopicId && Number(questionsDone) > 0) {
+        const log = await createQuestionLog({ subjectId: resolvedSubjectId, topicId: resolvedTopicId, feitas: Number(questionsDone), acertadas: Number(questionsCorrect || 0), sessionId: session.id });
+        if (log.status !== "ok") setMessage(`Sessão concluída, mas o registro de questões falhou: ${log.message}`);
+      }
     } else {
       setMessage(result.message);
     }
@@ -168,6 +197,7 @@ function SessionPageContent() {
             <p className="text-xl text-muted">Sessão encerrada</p>
             <h1 className="mt-3 font-display text-4xl font-semibold leading-tight">{subjectName} - {topicName}</h1>
             <p className="mt-4 text-xl leading-8 text-muted">Você completou o bloco com foco e já ganhou recompensa.</p>
+            {message ? <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{message}</p> : null}
           </div>
 
           <article className="rounded-[2rem] border border-border bg-surface-muted p-7">
@@ -213,19 +243,21 @@ function SessionPageContent() {
   }
 
   if (session) {
-    const targetSeconds = (session.duracaoAlvoMin ?? 50) * 60;
-    const progress = Math.min(100, Math.round((displayedSeconds / targetSeconds) * 100));
-    const estimatedXp = Math.max(0, Math.floor(displayedSeconds / 60));
+    const targetMinutes = Number(session.duracaoAlvoMin);
+    const targetSeconds = (Number.isFinite(targetMinutes) && targetMinutes > 0 ? targetMinutes : 50) * 60;
+    const progress = Number.isFinite(displayedSeconds) ? Math.min(100, Math.max(0, Math.round((displayedSeconds / targetSeconds) * 100))) : 0;
+    const estimatedXp = Number.isFinite(displayedSeconds) ? Math.max(0, Math.floor(displayedSeconds / 60)) : 0;
 
     return (
       <SessionLayout>
         <section className="min-h-[calc(100dvh-3rem)] space-y-6 pb-44">
+          {showRecovery ? <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-5"><section role="dialog" aria-modal="true" aria-labelledby="recovery-title" className="w-full max-w-md rounded-3xl border border-border bg-surface p-7"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-accent">Sessão recuperada</p><h2 id="recovery-title" className="mt-2 font-display text-2xl font-semibold">Você já tem um bloco em andamento</h2><p className="mt-3 text-muted">Tempo acumulado: {formatTimer(displayedSeconds)} · XP estimado: {Math.floor(displayedSeconds / 60)}</p><div className="mt-6 grid gap-3"><button type="button" onClick={() => { if (session.status === "PAUSED") void handleTransition(() => resumeSession(session.id)); setShowRecovery(false); }} className="min-h-12 rounded-full bg-accent px-5 font-semibold text-white">Retomar sessão</button><button type="button" onClick={() => { setAssessment("ok"); setShowRecovery(false); }} className="min-h-12 rounded-full border border-border px-5 font-semibold">Encerrar e avaliar</button></div></section></div> : null}
           <div className="flex items-start justify-between gap-4 border-b border-border pb-7">
             <div>
               <p className="text-xl text-muted">Em andamento</p>
               <h1 className="mt-3 font-display text-3xl font-semibold leading-tight">{subjectName} - {topicName}</h1>
             </div>
-            <div className="flex items-center gap-2"><ThemeToggle /><button type="button" onClick={() => router.push("/dashboard")} className="min-h-12 shrink-0 rounded-2xl border border-border bg-surface px-5 text-base font-semibold text-muted transition hover:border-accent hover:text-accent">Sair</button></div>
+            <div className="flex items-center gap-2"><ThemeToggle /><button type="button" onClick={() => void handleLeaveSession()} className="min-h-12 shrink-0 rounded-2xl border border-border bg-surface px-5 text-base font-semibold text-muted transition hover:border-accent hover:text-accent">Sair</button></div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -279,6 +311,7 @@ function SessionPageContent() {
                 ))}
               </div>
               <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nota opcional" rows={3} className="w-full rounded-2xl border border-border bg-surface-muted px-4 py-3 text-foreground outline-none" />
+              {session.type === "QUESTOES" ? <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border p-4"><label className="text-sm font-semibold text-muted">Questões feitas<input type="number" min="1" max="500" value={questionsDone} onChange={(event) => setQuestionsDone(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-surface-muted px-3 text-foreground" /></label><label className="text-sm font-semibold text-muted">Acertos<input type="number" min="0" max={questionsDone || 500} value={questionsCorrect} onChange={(event) => setQuestionsCorrect(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-surface-muted px-3 text-foreground" /></label><p className="col-span-2 text-sm text-muted">O percentual será calculado e salvo no seu desempenho. Deixe em branco se não quiser registrar agora.</p></div> : null}
               <button type="button" disabled={isBusy} onClick={() => void handleFinish()} className="min-h-12 w-full rounded-full bg-accent px-5 py-3 font-semibold text-white disabled:opacity-50">Confirmar encerramento</button>
             </div>
           ) : null}
@@ -328,7 +361,7 @@ export default function SessionPage() {
 }
 
 function formatTimer(totalSeconds: number) {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
   return [Math.floor(safeSeconds / 60), safeSeconds % 60]
     .map((value) => String(value).padStart(2, "0"))
     .join(":");

@@ -236,7 +236,7 @@ export default function SettingsPage() {
               ))}
               {goals.length === 0 && (
                 <p className="rounded-3xl border border-border bg-surface p-6 text-muted">
-                  O backend ainda não enviou objetivos disponíveis.
+                  Nenhum objetivo disponível para selecionar.
                 </p>
               )}
             </div>
@@ -244,12 +244,12 @@ export default function SettingsPage() {
 
           {step === "availability" && (
             <div className="mt-8 space-y-3">
-              <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+              <p className="rounded-2xl border border-border bg-surface-muted p-4 text-sm leading-6 text-muted">
                 {availabilitySource === "saved"
-                  ? "Mostrando a última disponibilidade salva neste navegador."
+                  ? "Exibindo sua última disponibilidade salva."
                   : availabilitySource === "suggested"
-                    ? "Estes valores são uma sugestão distribuída igualmente pela semana, não os valores salvos. O backend atual não oferece uma consulta da disponibilidade diária. Ajuste-os antes de salvar."
-                    : "O backend atual não oferece uma consulta da disponibilidade diária. Informe os minutos de cada dia antes de salvar."}
+                    ? "Estes valores são uma sugestão baseada na sua meta diária. Ajuste-os para organizar sua semana."
+                    : "Informe quantos minutos pretende estudar em cada dia."}
               </p>
               {weekdays.map((day, index) => (
                 <label key={day} className="flex items-center justify-between gap-4 rounded-3xl border border-border bg-surface p-4">
@@ -315,7 +315,7 @@ export default function SettingsPage() {
               )}
               {weights.length === 0 && (
                 <p className="rounded-3xl border border-border bg-surface p-6 text-muted">
-                  O backend ainda não enviou matérias para este objetivo.
+                  Nenhuma matéria está associada a este objetivo no momento.
                 </p>
               )}
             </div>

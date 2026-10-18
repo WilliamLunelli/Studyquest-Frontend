@@ -38,7 +38,7 @@ export default function RegisterPage() {
       description={
         <>
           Monte seu ciclo de estudos e acompanhe cada conquista. Já possui uma conta?{" "}
-          <Link href="/login" className="font-medium text-slate-700 underline underline-offset-2">Entre</Link>
+          <Link href="/login" className="font-medium text-accent underline underline-offset-2">Entre</Link>
         </>
       }
       backHref="/login"
@@ -48,7 +48,7 @@ export default function RegisterPage() {
         <AuthInput id="email" name="email" type="email" label="E-mail" placeholder="exemplo@gmail.com" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
         <PasswordInput id="password" name="password" label="Crie uma senha" placeholder="Mínimo de 8 caracteres" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={8} required />
         <AuthError message={errorMessage} />
-        <button type="submit" disabled={isLoading} className="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#974FC9] text-lg font-semibold text-white transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:text-[22px]">
+        <button type="submit" disabled={isLoading} className="inline-flex h-12 w-full items-center justify-center rounded-full bg-accent text-lg font-semibold text-white transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 sm:h-14 sm:text-[22px]">
           {isLoading ? "Criando..." : "Criar conta"}
         </button>
       </form>
