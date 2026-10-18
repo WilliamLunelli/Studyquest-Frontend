@@ -61,10 +61,53 @@ export type SessionClientError = {
 
 export type SessionResult<T> = { status: "ok"; data: T } | SessionClientError;
 
-type SessionPayload = ActiveSession | { sessao: ActiveSession };
+type SessionPayload = Partial<ActiveSession> & {
+  tipo?: SessionType;
+  sessao?: Partial<ActiveSession> & { tipo?: SessionType };
+};
 
-function unwrapSession(payload: SessionPayload): ActiveSession {
-  return "sessao" in payload ? payload.sessao : payload;
+function unwrapSession(payload: SessionPayload): SessionPayload {
+  return payload.sessao ?? payload;
+}
+
+/** Normalize the different session response shapes returned by create/active/pause/resume. */
+export function normalizeSession(payload: SessionPayload, fallback?: ActiveSession): ActiveSession {
+  const raw = unwrapSession(payload);
+  const preset = raw.preset ?? fallback?.preset ?? "P50_10";
+  const rawStartedAt = raw.startedAt ?? fallback?.startedAt;
+  const parsedStartedAt = rawStartedAt ? Date.parse(rawStartedAt) : Number.NaN;
+  const startedAt = Number.isFinite(parsedStartedAt) ? new Date(parsedStartedAt).toISOString() : new Date().toISOString();
+  const rawMinutes = Number(raw.minutosAcumulados);
+  const fallbackMinutes = Number(fallback?.minutosAcumulados);
+  const minutosAcumulados = Number.isFinite(rawMinutes) && raw.minutosAcumulados != null
+    ? Math.max(0, rawMinutes)
+    : Number.isFinite(fallbackMinutes) ? Math.max(0, fallbackMinutes) : 0;
+  const rawTarget = Number(raw.duracaoAlvoMin);
+  const fallbackTarget = Number(fallback?.duracaoAlvoMin);
+  const duracaoAlvoMin = Number.isFinite(rawTarget) && rawTarget > 0
+    ? rawTarget
+    : Number.isFinite(fallbackTarget) && fallbackTarget > 0
+      ? fallbackTarget
+      : preset === "P25_5" ? 25 : preset === "P50_10" ? 50 : null;
+  const status = raw.status ?? fallback?.status ?? "RUNNING";
+  const resumedAt = Object.prototype.hasOwnProperty.call(raw, "resumedAt")
+    ? raw.resumedAt ?? null
+    : fallback?.resumedAt ?? (status === "RUNNING" ? startedAt : null);
+
+  return {
+    id: raw.id ?? fallback?.id ?? "",
+    userId: raw.userId ?? fallback?.userId,
+    subjectId: raw.subjectId ?? fallback?.subjectId ?? "",
+    topicId: raw.topicId ?? fallback?.topicId ?? "",
+    type: raw.type ?? raw.tipo ?? fallback?.type ?? "TEORIA",
+    preset,
+    status,
+    startedAt,
+    resumedAt,
+    pausedAt: raw.pausedAt ?? fallback?.pausedAt ?? null,
+    minutosAcumulados,
+    duracaoAlvoMin,
+  };
 }
 
 async function request<T>(url: string, init: RequestInit = {}): Promise<SessionResult<T>> {
@@ -100,7 +143,7 @@ export function createSession(input: CreateSessionInput) {
   return request<SessionPayload>(buildApiUrl(API_CONFIG.endpoints.sessions), {
     method: "POST",
     body: JSON.stringify(input),
-  }).then((result) => result.status === "ok" ? { ...result, data: unwrapSession(result.data) } : result);
+  }).then((result) => result.status === "ok" ? { ...result, data: normalizeSession(result.data) } : result);
 }
 
 export async function getActiveSession(): Promise<SessionResult<ActiveSession | null>> {
@@ -113,7 +156,7 @@ export async function getActiveSession(): Promise<SessionResult<ActiveSession | 
     if (response.status === 401) return { status: "unauthorized", message: "Sua sessão expirou." };
     if (!response.ok) return { status: "error", message: await readError(response) };
 
-    return { status: "ok", data: unwrapSession((await response.json()) as SessionPayload) };
+    return { status: "ok", data: normalizeSession((await response.json()) as SessionPayload) };
   } catch {
     return { status: "offline", message: "Não foi possível verificar a sessão ativa." };
   }

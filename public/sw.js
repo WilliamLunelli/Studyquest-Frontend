@@ -74,9 +74,6 @@ async function handleGet(request) {
 async function handleMutation(request) {
   try {
     const response = await fetch(request.clone());
-    if (response.status === 409) {
-      await saveConflict(request, response);
-    }
     return response;
   } catch {
     await enqueueRequest(request);

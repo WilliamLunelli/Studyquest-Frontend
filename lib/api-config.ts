@@ -16,6 +16,12 @@ export const API_CONFIG = {
     dashboard: "/dashboard",
     home: "/home",
     goals: "/goals",
+    onboardingGoal: "/me/goal",
+    onboardingAvailability: "/me/availability",
+    onboardingDifficulties: "/me/difficulties",
+    cycles: "/cycles",
+    reviews: "/reviews",
+    questionLogs: "/question-logs",
 
     // Timed study sessions
     sessions: "/sessions",

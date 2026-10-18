@@ -54,7 +54,7 @@ export function Sidebar({ menuMain, menuProfile, activeIndex = 0 }: SidebarProps
             mobile
           />
         ))}
-        <SidebarItem label="Perfil" mobile />
+        <SidebarItem label="Perfil" href="/dashboard/analytics" mobile />
       </nav>
     </>
   );

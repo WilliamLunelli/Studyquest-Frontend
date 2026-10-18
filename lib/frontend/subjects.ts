@@ -1,4 +1,10 @@
-import { type SubjectCardData } from "@/lib/constants";
+export interface SubjectCardData {
+  title: string;
+  meta: string;
+  duration: string;
+  gradient: string;
+  areaName?: string;
+}
 
 export type SubjectAreaFilter = "Todas" | "Humanas" | "Exatas";
 
@@ -30,9 +36,9 @@ export function normalizeSubjectTitle(title: string) {
   return subjectTitleAliases[title] ?? title;
 }
 
-export function inferAreaName(title: string) {
+export function inferAreaName(title: string): string | undefined {
   const normalizedTitle = normalizeSubjectTitle(title);
-  return areaBySubject[normalizedTitle] ?? "Linguagens";
+  return areaBySubject[normalizedTitle];
 }
 
 export function normalizeSubjectMeta(subject: SubjectCardData): SubjectCardData {
@@ -41,13 +47,6 @@ export function normalizeSubjectMeta(subject: SubjectCardData): SubjectCardData 
     title: normalizeSubjectTitle(subject.title),
     areaName: subject.areaName ?? inferAreaName(subject.title),
   };
-
-  if (normalized.duration === "00:00:00") {
-    return {
-      ...normalized,
-      meta: "0 tópicos adicionados",
-    };
-  }
 
   return normalized;
 }
