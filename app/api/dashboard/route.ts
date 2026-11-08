@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
     const user = (await meResponse.json()) as BackendMe;
     const periodo = request.nextUrl.searchParams.get("periodo") ?? "7d";
     const dashboardResponse = await fetch(`${buildApiUrl(API_CONFIG.endpoints.dashboard)}?periodo=${encodeURIComponent(periodo)}`, { headers });
-    const dashboard = dashboardResponse.ok ? ((await dashboardResponse.json()) as BackendDashboard) : null;
+    const dashboardPayload = await dashboardResponse.json().catch(() => ({ message: "Resposta inválida ao carregar desempenho." }));
+    if (!dashboardResponse.ok) return NextResponse.json(dashboardPayload, { status: dashboardResponse.status });
+    const dashboard = dashboardPayload as BackendDashboard;
     const pendingSubjects = (dashboard?.horasPorMateria ?? []).map((subject, index) => ({
       title: subject.materia,
       meta: "Dados do ciclo atual",

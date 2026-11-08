@@ -1,7 +1,18 @@
 import { getAuthHeader } from "@/lib/api-config";
 
+export async function fetchNextReview(topicId: string) {
+  try {
+    const response = await fetch(`/api/reviews?topicId=${encodeURIComponent(topicId)}`, { headers: getAuthHeader(), cache: "no-store" });
+    if (!response.ok) return { status: "error" as const };
+    const reviews = await response.json() as Array<{ reviewId: string; topicId: string; agendadaPara: string }>;
+    return { status: "ok" as const, data: reviews[0] ?? null };
+  } catch { return { status: "error" as const }; }
+}
+
 export type ReviewDetail = {
   reviewId: string;
+  subjectId?: string;
+  topicId?: string;
   materia: string;
   assunto: string;
   repeticao: number;

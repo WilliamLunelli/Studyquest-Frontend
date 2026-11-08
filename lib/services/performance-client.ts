@@ -9,14 +9,16 @@ export type PerformanceMetrics = {
   aderenciaCiclo: { blocosPlanejados: number; blocosConcluidos: number; percentual: number };
 };
 
-export async function createQuestionLog(input: { subjectId: string; topicId: string; feitas: number; acertadas: number; sessionId?: string }) {
+export type QuestionLogInput = { subjectId: string; topicId: string; feitas: number; acertadas: number; sessionId?: string };
+export async function createQuestionLog(input: QuestionLogInput) {
   try {
     const response = await fetch("/api/question-logs", {
       method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...getAuthHeader() }, body: JSON.stringify(input),
     });
-    const payload = await response.json().catch(() => null) as { message?: string; percentualAcerto?: number; xpGanho?: number } | null;
+    const payload = await response.json().catch(() => null) as { message?: string; percentualAcerto?: number; xpGanho?: number; queued?: boolean } | null;
     if (response.status === 401) return { status: "unauthorized" as const, message: "Sua sessão expirou." };
     if (!response.ok) return { status: "error" as const, message: payload?.message ?? "Não foi possível registrar as questões." };
+    if (payload?.queued) return { status: "error" as const, message: "O registro ainda não foi confirmado. Confira seu desempenho quando houver conexão." };
     return { status: "ok" as const, data: payload };
   } catch { return { status: "error" as const, message: "Não foi possível registrar as questões. Verifique sua conexão e tente novamente." }; }
 }

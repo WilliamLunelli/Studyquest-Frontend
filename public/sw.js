@@ -1,5 +1,5 @@
-const CACHE_NAME = "studyquest-shell-v1";
-const RUNTIME_CACHE = "studyquest-runtime-v1";
+const CACHE_NAME = "studyquest-shell-v3";
+const RUNTIME_CACHE = "studyquest-runtime-v3";
 const DB_NAME = "studyquest-offline";
 const DB_VERSION = 1;
 const OUTBOX_STORE = "outbox";
@@ -33,9 +33,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isQueueableMutation(request)) {
-    event.respondWith(handleMutation(request));
-  }
+  // Mutations must reach the server. Do not acknowledge an offline write as saved.
+  // Existing outbox entries from the previous version can still be flushed below.
 });
 
 self.addEventListener("sync", (event) => {
@@ -60,41 +59,27 @@ async function handleGet(request) {
     }
     return response;
   } catch {
-    const cached = await cache.match(request);
+    const cached = (await cache.match(request)) ?? (await caches.match(request));
     if (cached) return cached;
 
     if (request.mode === "navigate") {
-      return (await caches.match("/")) ?? offlineResponse();
+      return offlineNavigationResponse();
     }
 
     return offlineResponse();
   }
 }
 
-async function handleMutation(request) {
-  try {
-    const response = await fetch(request.clone());
-    return response;
-  } catch {
-    await enqueueRequest(request);
-    await registerSync();
-    await notifyClients({ type: "QUEUE_UPDATED" });
-    return new Response(JSON.stringify({ queued: true, message: "Alteracao salva para sincronizar quando houver conexao." }), {
-      status: 202,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
-
-function isQueueableMutation(request) {
-  const url = new URL(request.url);
-  return url.pathname.startsWith("/api/") && request.method !== "GET" && request.method !== "HEAD" && url.pathname !== "/api/auth/login";
-}
-
 function offlineResponse() {
   return new Response(JSON.stringify({ offline: true, message: "Sem conexao. Tente novamente quando a rede voltar." }), {
     status: 503,
     headers: { "Content-Type": "application/json" },
+  });
+}
+
+function offlineNavigationResponse() {
+  return new Response(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>StudyQuest | Sem conexão</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:12vh auto;padding:1.5rem;line-height:1.6"><h1>Não foi possível abrir esta tela</h1><p>Reconecte para consultar sua sessão antes de iniciar outra. Esta mensagem não encerra nem reinicia sua sessão.</p><a href="">Tentar novamente</a><p><a href="/">Ir para o início</a></p></body></html>`, {
+    status: 503, headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
 
@@ -120,14 +105,6 @@ function transaction(storeName, mode, callback) {
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       }),
-  );
-}
-
-async function enqueueRequest(request) {
-  const headers = Object.fromEntries(request.headers.entries());
-  const body = request.method === "DELETE" ? null : await request.clone().text();
-  await transaction(OUTBOX_STORE, "readwrite", (store) =>
-    store.add({ url: request.url, method: request.method, headers, body, createdAt: Date.now(), attempts: 0 }),
   );
 }
 
@@ -157,12 +134,6 @@ async function flushOutbox() {
   }
 
   await notifyClients({ type: "SYNC_COMPLETE" });
-}
-
-async function registerSync() {
-  if (self.registration.sync) {
-    await self.registration.sync.register("studyquest-outbox");
-  }
 }
 
 async function notifyClients(message) {

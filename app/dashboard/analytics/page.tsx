@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { fetchPerformance, type PerformanceMetrics } from "@/lib/services/performance-client";
 import { BottomNavigation } from "@/components/BottomNavigation";
@@ -19,19 +20,26 @@ function averageAccuracy(metrics: PerformanceMetrics) {
 }
 
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<"7d" | "30d" | "90d">("7d");
+  const [dismissed, setDismissed] = useState<string[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
+    setMessage("");
     void fetchPerformance(period).then((result) => {
+      if (cancelled) return;
+      if (result.status === "unauthorized") { router.replace("/login"); return; }
       if (result.status === "ok") setMetrics(result.data);
       else { setMetrics(null); setMessage(result.message); }
       setIsLoading(false);
     });
-  }, [period]);
+    return () => { cancelled = true; };
+  }, [period, router]);
 
   if (isLoading && !metrics) return <AnalyticsState title="Carregando desempenho" message={`Buscando seus dados dos últimos ${period === "7d" ? "7" : period === "30d" ? "30" : "90"} dias.`} />;
   if (!metrics) return <AnalyticsState title="Desempenho indisponível" message={message || "Registre atividades de estudo para acompanhar seus indicadores."} />;
@@ -40,7 +48,9 @@ export default function AnalyticsPage() {
   const totalTarget = metrics.horasPorMateria.reduce((sum, item) => sum + item.minutosIdeaisSemana, 0);
   const accuracy = averageAccuracy(metrics);
   const maxMinutes = Math.max(...metrics.horasPorMateria.map((item) => item.minutosIdeaisSemana), 1);
-  const confidence = metrics.excessoConfianca[0];
+  const confidence = metrics.excessoConfianca.find((item) => !dismissed.includes(item.topicId));
+  const practiceSubject = confidence ? metrics.horasPorMateria.find((item) => item.materia === confidence.materia) : null;
+  const practiceHref = confidence && practiceSubject ? { pathname: "/session", query: { subjectId: practiceSubject.subjectId, topicId: confidence.topicId, subject: confidence.materia, topic: confidence.assunto, sessionType: "QUESTOES" } } : null;
 
   return (
     <main className="min-h-screen bg-page pb-24 text-foreground">
@@ -102,8 +112,8 @@ export default function AnalyticsPage() {
         {confidence ? <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 sm:p-8">
           <h2 className="font-display text-2xl font-semibold text-[#f21b52]">Excesso em confiança</h2>
           <p className="mt-6 text-xl font-semibold leading-8">Você marcou “tranquilo” em {confidence.assunto} mas está com {confidence.percentualAcerto}% de acertos</p>
-          <p className="mt-4 text-base leading-7 text-muted">As revisões voltaram para 1 dia, pratique questões antes de prosseguir</p>
-          <div className="mt-6 flex flex-wrap gap-3"><Link href={`/session?subject=${encodeURIComponent(confidence.materia)}&topic=${encodeURIComponent(confidence.assunto)}`} className="inline-flex min-h-14 items-center rounded-2xl bg-surface-muted px-5 font-semibold">Fazer questões</Link><button type="button" className="min-h-14 rounded-2xl bg-surface-muted px-5 font-semibold">Ignorar</button></div>
+          <p className="mt-4 text-base leading-7 text-muted">{confidence.revisaoAntecipada ? "A revisão foi antecipada. Pratique questões para reforçar este assunto." : "Pratique questões para conferir sua compreensão deste assunto."}</p>
+          <div className="mt-6 flex flex-wrap gap-3">{practiceHref ? <Link href={practiceHref} className="inline-flex min-h-14 items-center rounded-2xl bg-surface-muted px-5 font-semibold">Fazer questões</Link> : <Link href="/cycle" className="inline-flex min-h-14 items-center rounded-2xl bg-surface-muted px-5 font-semibold">Escolher um bloco de questões</Link>}<button type="button" onClick={() => setDismissed((items) => [...items, confidence.topicId])} className="min-h-14 rounded-2xl bg-surface-muted px-5 font-semibold">Dispensar aviso</button></div>
         </section> : null}
       </div>
       <BottomNavigation />

@@ -1,174 +1,73 @@
 # StudyQuest Frontend
 
-Frontend e camada de API no estilo BFF do StudyQuest, construídos com Next.js App Router, React, TypeScript, Tailwind CSS, Prisma e SQLite.
+Aplicação web de planejamento e acompanhamento de estudos, construída com Next.js App Router, React, TypeScript e Tailwind CSS. A interface consome a API REST dedicada do StudyQuest. Regras de negócio, autenticação, XP, ciclos, revisões e persistência são responsabilidade dessa API.
 
-Este repositório inclui:
-- Landing page pública
-- Fluxo de login com sessão baseada em cookie
-- Dashboard de progresso, ranking e matérias pendentes
-- Página de matérias com modal local para criação temporária de matéria
-- Rotas de API no app router do Next.js
+## Executar
 
-## 1. Status do Projeto
+Com Node.js e npm instalados, execute:
 
-Status atual deste frontend:
-- API de autenticação ativa para login e consulta do usuário atual.
-- API do dashboard ativa com métricas agregadas via Prisma.
-- API de matérias ativa para listagem e fluxo de adição temporária.
-- Páginas de UI conectadas às camadas compartilhadas em lib/frontend e lib/services.
-- Build de produção e validação do Prisma estão passando.
-
-## 2. Stack Tecnológica
-
-- Next.js 15 (App Router)
-- React 19
-- TypeScript 5
-- Tailwind CSS 3
-- Prisma 6.15
-- SQLite (desenvolvimento)
-- bcryptjs (comparação de senha no login)
-
-## 3. Requisitos
-
-Instale estes requisitos antes de executar:
-- Node.js 20 ou superior
-- npm 10 ou superior
-
-Recomendado:
-- VS Code
-- Extensões do Prisma e Tailwind CSS
-
-## 4. Variáveis de Ambiente
-
-Crie um arquivo local de variáveis de ambiente na raiz do projeto:
-
-Arquivo: .env
-
-Exemplo:
-
-```env
-DATABASE_URL="file:./prisma/dev.db"
-SESSION_SECRET="replace-with-a-long-random-secret"
-```
-
-Observações:
-- DATABASE_URL é obrigatório para validação do schema Prisma e geração do client.
-- SESSION_SECRET é obrigatório para assinar e validar os cookies de autenticação.
-
-## 5. Configuração e Execução
-
-1. Instale as dependências:
-
-```bash
+```sh
 npm install
-```
-
-2. Gere o Prisma client:
-
-```bash
-npm run prisma:generate
-```
-
-3. Execute as migrations:
-
-```bash
-npm run prisma:migrate
-```
-
-4. Popule o banco local com dados de exemplo (usuários, áreas, matérias, sessões e badges):
-
-```bash
-npm run prisma:seed
-```
-
-5. Inicie o servidor de desenvolvimento:
-
-```bash
 npm run dev
 ```
 
-Acesse http://localhost:3000
+O frontend abre em `http://localhost:3000`. A API deve estar em execução separadamente, com banco e catálogo configurados conforme o README do backend.
 
-## 6. Scripts Disponíveis
+Configure `.env` a partir de `.env.example`. A integração utiliza:
 
-- npm run dev: inicia o servidor local de desenvolvimento
-- npm run build: gera build de produção com checagens de tipos e lint
-- npm run start: executa a aplicação já buildada
-- npm run prisma:generate: regenera o Prisma client
-- npm run prisma:migrate: cria/aplica migration em desenvolvimento
-- npm run prisma:seed: popula dados de exemplo
-
-## 7. Login de Teste Local
-
-Após rodar o seed, estes usuários ficam disponíveis:
-
-- andre@emailteste.com / 123456
-- ana@emailteste.com / 123456
-- guilherme@emailteste.com / 123456
-- william@emailteste.com / 123456
-
-## 8. Rotas Principais
-
-Páginas:
-- /: landing page
-- /login: página de login
-- /dashboard: dashboard autenticado
-- /subjects: página de matérias autenticada
-
-Rotas de API:
-- POST /api/auth/login: valida credenciais e define cookie de sessão
-- GET /api/auth/me: retorna o usuário autenticado atual
-- GET /api/dashboard: retorna estatísticas do usuário, matérias pendentes e ranking
-- GET /api/subjects: retorna os cards de matérias do usuário logado
-- POST /api/subjects: valida o payload e retorna objeto temporário de matéria
-
-## 9. Visão Geral da Arquitetura
-
-Estrutura em alto nível:
-- app: páginas e handlers das rotas de API
-- components: componentes de UI reutilizáveis
-- lib/frontend: helpers e mapeadores puros de frontend
-- lib/services: wrappers client-side para chamadas de API das páginas
-- lib/session e lib/auth-session: assinatura e extração do token de cookie
-- prisma: schema e script de seed
-
-As telas de dashboard e matérias são organizadas em camadas para evitar lógica duplicada:
-- As páginas de UI cuidam da renderização e da orquestração de estado.
-- Os serviços cuidam da comunicação com API e da normalização das respostas.
-- Os helpers de frontend cuidam de transformações, filtros e armazenamento temporário local.
-
-## 10. Notas de Autenticação e Sessão
-
-- O login define um cookie httpOnly chamado studyquest_session.
-- O formato do token é userId + assinatura HMAC.
-- Rotas de API que exigem autenticação leem o cookie da requisição e validam a assinatura.
-- Em respostas não autorizadas, as páginas de dashboard e matérias redirecionam para /login.
-
-## 11. Checklist Pré-Push
-
-Execute estes comandos antes de fazer push:
-
-```bash
-npm run build
-npx prisma validate
-npm run prisma:generate
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3333/api
 ```
 
-Se os três passarem, o repositório está pronto para push no que diz respeito a build e Prisma.
+O navegador também acessa diretamente essa URL nas sessões. Em outro ambiente, configure a URL pública correta e a origem permitida pelo CORS do backend.
 
-## 12. Solução de Problemas
+```sh
+npm test
+npm run build
+npm start
+```
 
-### Aviso de datasource do Prisma no VS Code
+Os testes usam o executor nativo do Node e remoção de tipos TypeScript (`--experimental-strip-types`); utilize Node 22.18 ou superior para esse comando. O build utiliza Google Fonts e requer acesso de rede para buscar as fontes.
 
-Neste projeto, o Prisma CLI 6.15 exige datasource url em schema.prisma, enquanto alguns diagnósticos do editor podem sugerir o estilo do Prisma 7 (config-only datasource).
+## Percurso do usuário
 
-A mitigação atual no workspace está em .vscode/settings.json, desabilitando localmente os diagnósticos do Prisma.
+1. Criar conta ou entrar.
+2. Configurar objetivo, instituição, pesos, disponibilidade e dificuldades no onboarding.
+3. Gerar o ciclo e iniciar um bloco pela Home ou pela página de ciclo.
+4. Pausar, retomar, recuperar e encerrar a sessão com autoavaliação.
+5. Registrar opcionalmente questões e consultar o desempenho.
+6. Abrir revisões, realizar a recuperação ativa e iniciar uma sessão de revisão.
+7. Ajustar preferências, atualizar o ciclo quando desejado ou sair da conta.
 
-### Erro EPERM no Windows durante prisma generate
+Sessões de menos de cinco minutos ficam no histórico, mas a API não concede XP de estudo, não avança o bloco e não agenda revisão. O resultado final mostra os valores e a data de revisão efetivamente retornados pelo servidor. Questões são gravadas em uma segunda chamada; se ela falhar, o formulário pendente permite repetir somente esse registro.
 
-Se ocorrer erro de rename EPERM em query_engine-windows.dll.node:
-- Feche processos em execução de Next.js/Node.
-- Feche o Prisma Studio ou terminais que possam estar com lock no arquivo.
-- Exclua .next e rode novamente prisma generate.
-- Se necessário, reinicie o VS Code ou a máquina.
+## Organização e integração
 
+- `app/`: páginas e rotas intermediárias do Next.js.
+- `components/`: navegação, temas, autenticação e onboarding.
+- `lib/services/`: clientes HTTP e contratos da API.
+- `lib/frontend/session.ts`: normalização temporal e validação das questões.
+- `lib/user-storage.ts`: estado local separado por usuário.
+- `scripts/frontend-regressions.test.mjs`: regressões do cronômetro e da validação de questões.
+
+As rotas `/api/...` do Next.js encaminham autenticação, configurações, ciclo, Home, desempenho, revisões e questões à API. O dashboard agrega dados do usuário e de desempenho, preservando falhas do backend. `/api/me` consulta a conta atual. O detalhe de revisão é complementado com os IDs presentes nas listas de revisões de hoje e dos próximos 60 dias, sem depender do ciclo atual. A lista `/api/reviews` também permite atualizar a data exibida após as questões, quando o desempenho antecipa uma revisão.
+
+O JWT é armazenado no navegador e enviado como `Authorization: Bearer`. A saída da conta remove a autenticação local. Preferências, rascunhos e contexto das sessões são separados por usuário.
+
+
+O cronômetro mantém separadamente os minutos confirmados pela API e os segundos exibidos nesta tela. Os segundos locais são preservados ao pausar, retomar e recuperar a mesma sessão neste navegador. Eles nunca são enviados como duração nem usados para conceder XP. A conclusão de revisão confirma o mínimo de cinco minutos por uma consulta atualizada ao servidor.
+
+Existe uma pendência de contabilização no backend: cada pausa descarta a parte incompleta do minuto. O relógio visual evita o reset, mas não recupera esses segundos no banco. A tela identifica essa diferença. Blocos de 25/50 minutos selecionam os presets correspondentes; as demais durações usam timer livre com o alvo planejado.
+
+## Limitações da API a acompanhar
+
+- Não há leitura dos sete horários nem das dificuldades salvas. Configurações identifica o último estado deste navegador e exige preenchimento explícito quando ele não existe.
+- A sessão ativa não retorna IDs de matéria/assunto. O contexto local permite recuperar sessões iniciadas neste navegador; em outro aparelho, a sessão pode ser retomada/encerrada, mas o registro de questões fica indisponível sem esses IDs.
+- O backend ainda descarta segundos parciais em cada pausa. A duração precisa ser acumulada com maior precisão no serviço; o relógio visual não substitui a contabilização do servidor.
+- O detalhe individual de revisão não retorna os IDs. As listas existentes atendem revisões pendentes e próximas; outros casos ainda dependem de ampliar esse contrato.
+- Não há fluxo de recuperação de senha nem listagem completa de assuntos dominados. A interface informa os limites.
+- A API não oferece chave de idempotência para questões. Após uma perda de conexão com resultado incerto, confira o desempenho antes de repetir o registro.
+
+O service worker mantém o carregamento básico em cache. Novas gravações não são enfileiradas offline nem apresentadas como salvas sem confirmação do servidor. A fila legada pode concluir pedidos pendentes da versão anterior.
+
+Os documentos de auditoria e de correções na pasta de documentação registram o escopo acadêmico, as verificações e as pendências do backend.

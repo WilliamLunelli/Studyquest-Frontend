@@ -1,183 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Home as HomeIcon, UserCircle, Settings } from "lucide-react";
+import { ArrowRight, RefreshCw, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { type HomePayload, fetchHomeClient } from "@/lib/services/home-client";
 import { BottomNavigation } from "@/components/BottomNavigation";
 
-function formatWeekday() {
-  const weekday = new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date());
-  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
-}
-
-function sessionHref(blockId: string, subject: string, topic: string | null) {
-  const params = new URLSearchParams({ blockId, subject });
-  if (topic) params.set("topic", topic);
-  return `/session?${params.toString()}`;
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [home, setHome] = useState<HomePayload | null>(null);
-  const [isEmpty, setIsEmpty] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    void fetchHomeClient().then((result) => {
-      if (result.status === "unauthorized") {
-        router.push("/login");
-        return;
-      }
-
-      if (result.status === "empty") {
-        setIsEmpty(true);
-      } else if (result.status === "error") {
-        setErrorMessage(result.message);
-      } else {
-        setHome(result.data);
-      }
-
-      setIsLoading(false);
-    });
+  const loadHome = useCallback(async () => {
+    setIsLoading(true);
+    setMessage("");
+    const result = await fetchHomeClient();
+    if (result.status === "unauthorized") { router.replace("/login"); return; }
+    if (result.status === "ok") setHome(result.data);
+    else { setHome(null); setMessage(result.message); }
+    setIsLoading(false);
   }, [router]);
-
-  if (isLoading) {
-    return <HomeState title="Carregando sua Home" message="Buscando seu próximo bloco de estudos." />;
-  }
+  useEffect(() => { void loadHome(); }, [loadHome]);
 
   const block = home?.proximoBloco;
-  const hasContent = Boolean(block) && !isEmpty;
+  const sessionParams = block ? new URLSearchParams({ blockId: block.blocoId, subject: block.materia, ...(block.assunto ? { topic: block.assunto } : {}) }) : null;
 
   return (
-    <main className="min-h-screen bg-page pb-24 text-foreground">
-      <div className="mx-auto w-full max-w-2xl px-5 pb-8 pt-7 sm:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/dashboard" className="font-display text-3xl font-semibold tracking-tight">StudyQuest</Link>
-          <div className="flex items-center gap-3">
-            <p className="text-base text-muted sm:text-lg">Sequência: <strong className="font-semibold text-foreground">{home?.streak.atual ?? 0} dias</strong></p>
-            <ThemeToggle />
-          </div>
+    <main className="min-h-screen bg-page pb-28 text-foreground">
+      <div className="mx-auto w-full max-w-2xl px-5 py-7 sm:px-8">
+        <header className="flex items-center justify-between gap-3 border-b border-border pb-6">
+          <Link href="/dashboard" className="font-display text-2xl font-semibold sm:text-3xl">StudyQuest</Link>
+          <div className="flex items-center gap-3"><span className="text-sm text-muted">Sequência: <strong>{home?.streak.atual ?? 0} dias</strong></span><ThemeToggle /></div>
         </header>
-        <div className="mt-7 h-px bg-border" />
 
-        {errorMessage ? <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
-
-        {hasContent && block ? home?.streak.atual === 0 ? <FirstDayHome home={home} /> : <FilledHome home={home} /> : <EmptyHome />}
+        {isLoading ? <p role="status" className="mt-8 text-muted">Carregando sua rotina...</p> : home && block ? <>
+          <h1 className="mt-8 font-display text-3xl font-semibold">Seu próximo passo</h1>
+          <section aria-label="Seu progresso" className="mt-5 grid grid-cols-2 gap-4">
+            <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Nível {home.xp.nivel} · {home.xp.titulo}</p><p className="mt-2 font-display text-2xl font-semibold">{home.xp.total} XP</p><progress aria-label="Progresso do nível" value={home.xp.xpNoNivel} max={Math.max(1, home.xp.xpNoNivel + home.xp.xpParaProximoNivel)} className="mt-3 h-2 w-full accent-[#974fc9]" /><p className="mt-2 text-xs text-muted">Faltam {home.xp.xpParaProximoNivel} XP para o próximo nível</p></article>
+            <article className="rounded-3xl border border-border bg-surface p-5"><p className="text-sm text-muted">Meta de hoje</p><p className="mt-2 font-display text-2xl font-semibold">{home.streak.minutosHoje} min</p><p className="mt-3 text-sm text-muted">{home.streak.metaDiariaMin > 0 ? `de ${home.streak.metaDiariaMin} min${home.streak.metaCumprida ? " · meta cumprida" : ""}` : "Dia sem meta definida"}</p><p className="mt-2 text-xs text-muted">{home.streak.escudosDisponiveis} escudos disponíveis</p></article>
+          </section>
+          <section className="mt-6 rounded-[2rem] border border-border bg-surface p-7">
+            <p className="text-sm font-semibold uppercase tracking-widest text-accent">Próximo bloco</p>
+            <h2 className="mt-3 font-display text-3xl font-semibold">{block.materia}</h2>
+            <p className="mt-2 text-lg text-muted">{block.assunto ?? "Assunto a definir"} · {block.duracaoMin} min</p>
+            <Link href={`/session?${sessionParams}`} className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-full bg-[#f21b52] px-5 text-lg font-semibold text-white">Começar {block.duracaoMin} min de {block.materia}<ArrowRight size={21} /></Link>
+            <Link href="/cycle" className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-border px-4 font-semibold">Trocar bloco</Link>
+          </section>
+          <section className="mt-8" aria-label="Revisões pendentes">
+            <h2 className="font-display text-2xl font-semibold">Revisões pendentes · {home.revisoesHoje.length}</h2>
+            <div className="mt-4 space-y-3">{home.revisoesHoje.length ? home.revisoesHoje.map((review) => <Link key={review.reviewId} href={`/review?reviewId=${encodeURIComponent(review.reviewId)}`} className="block rounded-3xl border border-border bg-surface p-5 hover:border-accent"><h3 className="font-semibold">{review.materia} · {review.assunto}</h3><p className="mt-2 text-sm text-muted">{review.atrasada ? "Atrasada" : "Hoje"} · {new Date(review.agendadaPara).toLocaleDateString("pt-BR")} · multiplicador {review.multiplicadorXp}x</p></Link>) : <p className="rounded-3xl border border-border bg-surface p-5 text-muted">Nenhuma revisão pendente para hoje. As próximas revisões serão agendadas ao concluir suas sessões.</p>}</div>
+          </section>
+          <Link href="/cycle" className="mt-6 block rounded-3xl border border-border bg-surface p-5 font-semibold">Ver ciclo e declarar domínio de assuntos <ArrowRight className="ml-2 inline" size={18} /></Link>
+        </> : !isLoading ? <section className="mt-8 rounded-3xl border border-border bg-surface p-7">
+          <h1 className="font-display text-2xl font-semibold">Vamos preparar sua rotina</h1>
+          <p role="status" className="mt-4 text-muted">{message || "Configure seu objetivo e gere um ciclo para começar."}</p>
+          <Link href="/settings" className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-accent px-5 font-semibold text-white"><Settings size={18} />Configurar ciclo</Link>
+          <button type="button" onClick={() => void loadHome()} className="ml-3 mt-3 inline-flex min-h-12 items-center gap-2 px-3 font-semibold"><RefreshCw size={18} />Tentar novamente</button>
+        </section> : null}
       </div>
       <BottomNavigation />
     </main>
   );
-}
-
-function FilledHome({ home }: { home: HomePayload }) {
-  const block = home.proximoBloco!;
-  const reviewCount = home.revisoesHoje.length;
-  const typeLabel = block.tipoSugerido === "revisao" ? "Revisão" : block.tipoSugerido === "questoes" ? "Questões" : "Teoria";
-
-  return (
-    <>
-      <h1 className="mt-8 font-display text-4xl font-semibold tracking-tight">Hoje - {formatWeekday()}</h1>
-
-      <section className="mt-6 rounded-[2rem] border border-border bg-surface-muted px-7 py-8">
-        <p className="font-display text-6xl font-semibold leading-none tracking-tight">{block.duracaoMin} min</p>
-        <p className="mt-5 text-xl text-muted">Bloco agendado para hoje</p>
-      </section>
-
-      <section className="mt-6 rounded-[2rem] border border-border bg-surface p-7">
-        <p className="font-display text-3xl font-semibold leading-tight sm:text-4xl">{block.materia}:</p>
-        <h2 className="mt-1 font-display text-3xl font-semibold leading-tight sm:text-4xl">{block.assunto ?? "Próximo assunto"}</h2>
-        <p className="mt-7 text-lg text-muted">
-          {block.area ? `${block.area} · ` : "Ciclo de estudos · "}{block.peso ? `peso ${block.peso} ` : ""}{typeLabel}
-        </p>
-        <div className="mt-6 flex gap-3">
-          <Link href={sessionHref(block.blocoId, block.materia, block.assunto) as never} className="inline-flex min-h-14 flex-1 items-center justify-center gap-3 rounded-full bg-[#f21b52] px-5 text-xl font-semibold text-white transition hover:brightness-95">
-            Começar <ArrowRight aria-hidden="true" size={25} />
-          </Link>
-          <button type="button" className="min-h-14 rounded-full border border-border bg-surface px-5 text-base font-semibold text-foreground transition hover:border-accent hover:text-accent">
-            Trocar bloco
-          </button>
-        </div>
-        <p className="mt-6 text-sm text-muted">Bloco {block.ordem ?? 1} do ciclo</p>
-      </section>
-
-      <section className="mt-10">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="font-display text-2xl font-semibold">Revisões pendentes:</h2>
-          <span className="font-display text-3xl font-semibold text-[#f21b52]">{reviewCount}</span>
-        </div>
-        <div className="mt-5 space-y-4">
-          {home.revisoesHoje.length > 0 ? home.revisoesHoje.map((review) => (
-            <Link key={review.reviewId} href={`/review?reviewId=${encodeURIComponent(review.reviewId)}`} className="flex items-center justify-between gap-4 rounded-3xl border border-border bg-surface px-6 py-5 transition hover:border-accent">
-              <div className="min-w-0">
-                <h3 className="truncate font-display text-xl font-semibold">{review.materia} - {review.assunto}</h3>
-                <p className="mt-1 text-base text-muted">{review.atrasada ? "Marcado como \"travado\" há 1 dia" : `Intervalo de ${review.multiplicadorXp === 2 ? "3" : "1"} dias`}</p>
-              </div>
-              <span className={`shrink-0 text-xl font-semibold ${review.atrasada ? "text-[#f21b52]" : "text-muted"}`}>{review.atrasada ? "Hoje" : "Amanhã"}</span>
-            </Link>
-          )) : <p className="rounded-3xl border border-border bg-surface px-6 py-5 text-muted">Nenhuma revisão pendente para hoje.</p>}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function FirstDayHome({ home }: { home: HomePayload }) {
-  const block = home.proximoBloco!;
-
-  return (
-    <>
-      <div className="mt-7 flex flex-wrap items-center gap-3">
-        <span className="rounded-full bg-accent-soft px-4 py-2 text-sm font-semibold text-accent">Primeiro dia</span>
-        <span className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-muted">HOJE · DIA 1</span>
-      </div>
-      <section className="mt-6 rounded-[2rem] border border-border bg-surface-muted px-7 py-8">
-        <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">Seu ciclo está pronto.</h1>
-        <p className="mt-3 text-xl text-muted">Comece pelo bloco mais pesado.</p>
-      </section>
-      <section className="mt-6 rounded-[2rem] border border-border bg-surface p-6">
-        <Link href={sessionHref(block.blocoId, block.materia, block.assunto) as never} className="flex min-h-16 items-center justify-between gap-4 rounded-full bg-[#f21b52] px-6 text-lg font-semibold text-white transition hover:brightness-95 sm:text-xl">
-          <span>Começar {block.duracaoMin} min de {block.materia}</span><ArrowRight aria-hidden="true" size={25} />
-        </Link>
-        <p className="mt-5 text-lg leading-7 text-muted">O primeiro bloco é {block.materia}, com {block.duracaoMin} min{block.peso ? ` e peso ${block.peso}` : ""}.</p>
-      </section>
-      <section className="mt-8">
-        <h2 className="font-display text-2xl font-semibold">Revisões pendentes</h2>
-        <article className="mt-4 rounded-3xl border border-border bg-surface p-6">
-          <h3 className="font-display text-xl font-semibold">Nada para revisar hoje</h3>
-          <p className="mt-2 text-base leading-7 text-muted">A primeira revisão será agendada quando você responder “como foi” no fim da sessão.</p>
-        </article>
-      </section>
-      <section className="mt-8">
-        <h2 className="font-display text-2xl font-semibold">Domínio de assuntos</h2>
-        <article className="mt-4 rounded-3xl border border-border bg-surface p-6">
-          <h3 className="font-display text-xl font-semibold">Nenhum assunto dominado ainda</h3>
-          <p className="mt-2 text-base leading-7 text-muted">Seu domínio aparece aqui depois das primeiras sessões.</p>
-        </article>
-      </section>
-    </>
-  );
-}
-
-function EmptyHome() {
-  return (
-    <section className="mt-10 rounded-[2rem] border border-border bg-surface p-7 text-center sm:p-10">
-      <CalendarDays aria-hidden="true" className="mx-auto text-accent" size={42} strokeWidth={1.6} />
-      <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-accent">Seu ciclo começa aqui</p>
-      <h1 className="mt-3 font-display text-3xl font-semibold leading-tight">Ainda não há blocos para hoje.</h1>
-      <p className="mx-auto mt-4 max-w-md text-base leading-7 text-muted">Quando seu ciclo de estudos estiver configurado, o próximo bloco, as revisões e sua sequência aparecerão nesta tela.</p>
-      <Link href="/settings" className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-6 text-lg font-semibold text-white sm:w-auto sm:min-w-64">
-        <Settings aria-hidden="true" size={20} /> Configurar ciclo
-      </Link>
-    </section>
-  );
-}
-
-
-
-function HomeState({ title, message }: { title: string; message: string }) {
-  return <main className="flex min-h-screen items-center justify-center bg-page px-5 text-foreground"><div className="w-full max-w-sm rounded-3xl border border-border bg-surface p-6 text-center"><h1 className="font-display text-2xl font-semibold">{title}</h1><p className="mt-2 text-muted">{message}</p></div></main>;
 }

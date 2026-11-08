@@ -37,19 +37,25 @@ export default function CyclePage() {
     if (result.status === "ok") {
       setCycle(result.data);
       setMessage("");
-    } else {
+    } else if (result.status === "unauthorized") router.replace("/login");
+    else {
       setMessage(result.message);
     }
     setIsRegenerating(false);
   }
 
   async function saveBlock(block: CycleBlock, changes: { duracaoMin?: number; ordem?: number }) {
+    if (changes.duracaoMin !== undefined && (!Number.isInteger(changes.duracaoMin) || changes.duracaoMin < 25 || changes.duracaoMin > 60)) {
+      setMessage("A duração deve ser um número inteiro de 25 a 60 minutos."); return;
+    }
     setIsSaving(true);
     const result = await updateCycleBlock(block.id, changes);
-    if (result.status !== "ok") setMessage(result.message);
+    if (result.status === "unauthorized") router.replace("/login");
+    else if (result.status !== "ok") setMessage(result.message);
     else {
       const refreshed = await fetchCurrentCycle();
       if (refreshed.status === "ok") setCycle(refreshed.data);
+      else { setMessage(refreshed.message); setIsSaving(false); return; }
       setEditingBlock(null);
       setMessage("");
     }
@@ -64,7 +70,8 @@ export default function CyclePage() {
       setMasteredBlocks((current) => [...current.filter((item) => item.topicId !== result.data.bloco?.topicId), result.data.bloco!]);
       setConfirmMastery(null);
       setMessage(`Assunto declarado como dominado. ${result.data.xpGanho ? `+${result.data.xpGanho} XP.` : ""}`);
-    } else setMessage(result.message);
+    } else if (result.status === "unauthorized") router.replace("/login");
+    else setMessage(result.message);
     setIsSaving(false);
   }
 
@@ -99,7 +106,7 @@ export default function CyclePage() {
             {editingBlock?.id === block.id ? <div className="flex flex-wrap items-end gap-3"><label className="flex-1 text-sm font-semibold text-muted">Duração (25–60 min)<input type="number" min={25} max={60} value={durationDraft} onChange={(event) => setDurationDraft(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-page px-3 text-foreground" /></label><button type="button" disabled={isSaving} onClick={() => void saveBlock(block, { duracaoMin: Number(durationDraft) })} className="min-h-12 rounded-xl bg-accent px-5 font-semibold text-white disabled:opacity-50">Salvar</button><button type="button" onClick={() => setEditingBlock(null)} aria-label="Cancelar edição" className="min-h-12 rounded-xl border border-border px-3"><X size={19} /></button></div> : <div className="flex flex-wrap items-center justify-between gap-4"><Link href={`/session?blockId=${encodeURIComponent(block.id)}&subject=${encodeURIComponent(block.materia)}${block.assunto ? `&topic=${encodeURIComponent(block.assunto)}` : ""}`} className="min-w-0 flex-1"><p className="text-sm font-semibold text-muted">Bloco {block.ordem}</p><h3 className="mt-1 font-display text-xl font-semibold">{block.materia}{block.assunto ? ` - ${block.assunto}` : ""}</h3><span className="mt-2 inline-block text-base font-semibold text-muted">{block.duracaoMin} min</span></Link>
               {editMode ? <div className="flex items-center gap-2"><button type="button" disabled={block.ordem <= 1 || isSaving} aria-label={`Mover bloco ${block.ordem} para cima`} onClick={() => void saveBlock(block, { ordem: block.ordem - 1 })} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border disabled:opacity-40"><ChevronUp size={20}/></button><button type="button" disabled={block.ordem >= cycle.blocos.length || isSaving} aria-label={`Mover bloco ${block.ordem} para baixo`} onClick={() => void saveBlock(block, { ordem: block.ordem + 1 })} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border disabled:opacity-40"><ChevronDown size={20}/></button><button type="button" disabled={!block.topicId} onClick={() => setConfirmMastery(block)} className="min-h-11 rounded-xl border border-border px-3 text-sm font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-40">Dominado</button><button type="button" onClick={() => { setEditingBlock(block); setDurationDraft(String(block.duracaoMin)); }} aria-label={`Editar duração do bloco ${block.ordem}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-border"><Pencil size={18}/></button></div> : null}</div>}
           </article>)}</div>
-          {masteredBlocks.length ? <section className="mt-8 border-t border-border pt-6"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-accent">Dominados · fora de novos ciclos</p><div className="mt-3 space-y-2">{masteredBlocks.map((block) => <article key={block.id} className="rounded-2xl bg-accent-soft p-4 font-semibold">{block.materia}{block.assunto ? ` · ${block.assunto}` : ""}</article>)}</div></section> : null}
+          {masteredBlocks.length ? <section className="mt-8 border-t border-border pt-6"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-accent">Dominados nesta visita · fora de novos ciclos</p><div className="mt-3 space-y-2">{masteredBlocks.map((block) => <article key={block.id} className="rounded-2xl bg-accent-soft p-4 font-semibold">{block.materia}{block.assunto ? ` · ${block.assunto}` : ""}</article>)}</div></section> : null}
         </section> : <section className="mt-8 rounded-[2rem] border border-border bg-surface p-7 text-center sm:p-10">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-soft text-accent">
             <CalendarDays aria-hidden="true" size={38} strokeWidth={1.7} />

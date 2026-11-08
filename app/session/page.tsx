@@ -1,368 +1,265 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Pause, Play, Square } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
 import { fetchCurrentCycle } from "@/lib/services/cycle-client";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import {
-  type ActiveSession,
-  type CreateSessionInput,
-  createSession,
-  finishSession,
-  getActiveSession,
-  normalizeSession,
-  pauseSession,
-  resumeSession,
-  type SelfAssessment,
-  type SessionPreset,
-  type SessionType,
-} from "@/lib/services/sessions-client";
-import { createQuestionLog } from "@/lib/services/performance-client";
+import { createSession, finishSession, getActiveSession, pauseSession, resumeSession, type ActiveSession, type FinishedSession, type SelfAssessment, type SessionPreset, type SessionType } from "@/lib/services/sessions-client";
+import { elapsedSessionSeconds, presetForBlockDuration, validateQuestionCounts } from "@/lib/frontend/session";
+import { createQuestionLog, type QuestionLogInput } from "@/lib/services/performance-client";
+import { readUserStorage, writeUserStorage } from "@/lib/user-storage";
+import { fetchNextReview } from "@/lib/services/reviews-client";
 
-const presets: Array<{ value: SessionPreset; label: string; duration?: 25 | 50 }> = [
-  { value: "P25_5", label: "25 / 5", duration: 25 },
-  { value: "P50_10", label: "50 / 10", duration: 50 },
-  { value: "LIVRE", label: "Livre" },
-];
-
-const assessments: Array<{ value: SelfAssessment; label: string; interval: string }> = [
-  { value: "travei", label: "Travei", interval: "1 dia" },
-  { value: "ok", label: "Ok", interval: "3 dias" },
-  { value: "tranquilo", label: "Tranquilo", interval: "7 dias" },
-];
+const presets = [{ value: "P25_5", label: "25 / 5", duration: 25 }, { value: "P50_10", label: "50 / 10", duration: 50 }, { value: "LIVRE", label: "Livre" }] as const;
+const assessments = [{ value: "travei", label: "Travei" }, { value: "ok", label: "Ok" }, { value: "tranquilo", label: "Tranquilo" }] as const;
+const typeLabel = (type: SessionType) => type === "QUESTOES" ? "Questões" : type === "REVISAO" ? "Revisão" : "Teoria";
+type Completion = { result: FinishedSession; subjectName: string; topicName: string; questionXp: number; displaySeconds?: number; pending?: QuestionLogInput; questionsSaved?: boolean; reviewDateUnconfirmed?: boolean };
 
 function SessionPageContent() {
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
   const router = useRouter();
-  const blockId = searchParams.get("blockId") ?? "";
-  const subjectId = searchParams.get("subjectId") ?? "";
-  const topicId = searchParams.get("topicId") ?? "";
-  const reviewId = searchParams.get("reviewId") ?? "";
-  const subjectName = searchParams.get("subject") ?? "Sessão de estudo";
-  const topicName = searchParams.get("topic") ?? "Assunto selecionado";
+  const blockId = params.get("blockId") ?? "";
+  const reviewId = params.get("reviewId") ?? "";
+  const subjectName = params.get("subject") ?? "Sessão de estudo";
+  const topicName = params.get("topic") ?? "Assunto selecionado";
+  const [subjectId, setSubjectId] = useState(params.get("subjectId") ?? "");
+  const [topicId, setTopicId] = useState(params.get("topicId") ?? "");
   const [session, setSession] = useState<ActiveSession | null>(null);
-  const [sessionType, setSessionType] = useState<SessionType>(searchParams.get("sessionType") === "REVISAO" ? "REVISAO" : "TEORIA");
+  const [sessionType, setSessionType] = useState<SessionType>(params.get("sessionType") === "REVISAO" || reviewId ? "REVISAO" : params.get("sessionType") === "QUESTOES" ? "QUESTOES" : "TEORIA");
   const [preset, setPreset] = useState<SessionPreset>("P50_10");
+  const [plannedDurationMin, setPlannedDurationMin] = useState<number | undefined>();
+  const presetChosen = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkedActive, setCheckedActive] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [elapsedNow, setElapsedNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now());
   const [assessment, setAssessment] = useState<SelfAssessment | null>(null);
   const [note, setNote] = useState("");
-  const [finished, setFinished] = useState<{ xp: number; minutes: number } | null>(null);
-  const [resolvedSubjectId, setResolvedSubjectId] = useState(subjectId);
-  const [resolvedTopicId, setResolvedTopicId] = useState(topicId);
+  const [finished, setFinished] = useState<Completion | null>(null);
   const [showRecovery, setShowRecovery] = useState(false);
   const [questionsDone, setQuestionsDone] = useState("");
   const [questionsCorrect, setQuestionsCorrect] = useState("");
+  const assessmentRef = useRef<HTMLDivElement>(null);
+  const actionInFlight = useRef(false);
+  const syncing = useRef(false);
+  const syncRevision = useRef(0);
+  const sessionRef = useRef(session);
+  const mounted = useRef(false);
+  sessionRef.current = session;
 
-  useEffect(() => {
-    let cancelled = false;
-    void getActiveSession().then((result) => {
-      if (cancelled) return;
-      if (result.status === "unauthorized") {
-        router.push("/login");
-      } else if (result.status === "ok") {
-        setSession(result.data);
-        if (result.data) setShowRecovery(true);
-      } else {
-        setMessage(result.message);
+  function beginAction() {
+    if (actionInFlight.current) return false;
+    actionInFlight.current = true;
+    syncRevision.current++;
+    setIsBusy(true);
+    return true;
+  }
+  function endAction() { actionInFlight.current = false; setIsBusy(false); }
+
+  function fail(result: { status: string; message: string }) {
+    if (result.status === "unauthorized") router.replace("/login");
+    else setMessage(result.message);
+  }
+
+  const checkActive = useCallback(async (quiet = false): Promise<void> => {
+    if (actionInFlight.current || syncing.current) return;
+    syncing.current = true;
+    const revision = ++syncRevision.current;
+    if (!quiet) setIsLoading(true);
+    const result = await getActiveSession();
+    syncing.current = false;
+    if (!mounted.current) return;
+    if (revision !== syncRevision.current) {
+      if (!actionInFlight.current) void checkActive(true);
+      return;
+    }
+    if (result.status === "unauthorized") { router.replace("/login"); return; }
+    if (result.status === "ok") {
+      const previousId = sessionRef.current?.id;
+      setCheckedActive(true);
+      setSession(result.data);
+      setNow(Date.now());
+      if (!quiet || (result.data && result.data.id !== previousId)) setShowRecovery(Boolean(result.data));
+      if (!result.data) {
+        setShowRecovery(false);
+        setAssessment(null);
+        if (previousId) setMessage("Esta sessão foi encerrada em outra aba ou aparelho. Confira seu progresso na Home.");
+        const pending = readUserStorage<Completion>("pending_questions");
+        if (pending?.pending && pending.result?.sessao?.id) setFinished(pending);
       }
-      setIsLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    } else { setCheckedActive(false); setMessage(result.message); }
+    setIsLoading(false);
   }, [router]);
 
   useEffect(() => {
-    if (!blockId || (resolvedSubjectId && resolvedTopicId)) return;
-    void fetchCurrentCycle().then((result) => {
-      if (result.status !== "ok") return;
-      const block = result.data.blocos.find((item) => item.id === blockId);
-      if (!block) return;
-      setResolvedSubjectId(block.subjectId);
-      if (block.topicId) setResolvedTopicId(block.topicId);
-    });
-  }, [blockId, resolvedSubjectId, resolvedTopicId]);
-
-  useEffect(() => {
-    if (!session || session.status !== "RUNNING") return;
-    const timer = window.setInterval(() => setElapsedNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [session]);
-
-  const displayedSeconds = useMemo(() => {
-    if (!session) return 0;
-    const accumulatedMinutes = Number(session.minutosAcumulados);
-    const accumulated = (Number.isFinite(accumulatedMinutes) ? Math.max(0, accumulatedMinutes) : 0) * 60;
-    if (session.status !== "RUNNING" || !session.resumedAt) return accumulated;
-    const resumedAt = Date.parse(session.resumedAt);
-    if (!Number.isFinite(resumedAt)) return accumulated;
-    return accumulated + Math.max(0, Math.floor((elapsedNow - resumedAt) / 1000));
-  }, [elapsedNow, session]);
-
-  const selectedPreset = presets.find((item) => item.value === preset) ?? presets[1];
-
-  async function handleStart() {
-    if (!blockId && (!resolvedSubjectId || !resolvedTopicId)) {
-      setMessage("Escolha uma matéria e um assunto antes de iniciar a sessão.");
-      return;
-    }
-    if (!resolvedSubjectId || !resolvedTopicId) {
-      setMessage("Aguardando os dados da matéria e do assunto.");
-      return;
-    }
-
-    setIsBusy(true);
-    setMessage("");
-    const input: CreateSessionInput = {
-      ...(blockId ? { blocoId: blockId } : {}),
-      subjectId: resolvedSubjectId,
-      topicId: resolvedTopicId,
-      tipo: sessionType,
-      preset,
-      ...(selectedPreset.duration ? { duracaoAlvoMin: selectedPreset.duration } : {}),
-      ...(reviewId ? { reviewId } : {}),
+    mounted.current = true;
+    void checkActive();
+    const refresh = () => {
+      if (document.visibilityState === "visible" && sessionRef.current) void checkActive(true);
     };
-    const result = await createSession(input);
-    if (result.status === "ok") setSession({ ...result.data, resumedAt: result.data.startedAt });
-    else setMessage(result.message);
-    setIsBusy(false);
-  }
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      mounted.current = false;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [checkActive]);
+  useEffect(() => {
+    if (session || !blockId || (subjectId && topicId)) return;
+    let cancelled = false;
+    void fetchCurrentCycle().then((result) => {
+      if (cancelled) return;
+      if (result.status === "unauthorized") { router.replace("/login"); return; }
+      if (result.status !== "ok") { setMessage(result.message); return; }
+      const block = result.data.blocos.find((b) => b.id === blockId);
+      if (!block?.topicId) { setMessage("Este bloco não tem um assunto disponível. Escolha outro bloco no ciclo."); return; }
+      setSubjectId(block.subjectId); setTopicId(block.topicId);
+      setPlannedDurationMin(block.duracaoMin);
+      if (!presetChosen.current) setPreset(presetForBlockDuration(block.duracaoMin));
+    });
+    return () => { cancelled = true; };
+  }, [blockId, subjectId, topicId, session, router]);
+  useEffect(() => {
+    if (session?.status !== "RUNNING") return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [session]);
+  useEffect(() => { if (assessment) assessmentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [assessment]);
 
-  async function handleTransition(action: () => ReturnType<typeof pauseSession>) {
-    if (!session) return;
-    setIsBusy(true);
+  const seconds = session ? elapsedSessionSeconds(session, now) : 0;
+  const activeSubject = session?.subjectName ?? "Sessão recuperada";
+  const activeTopic = session?.topicName ?? "Assunto não identificado";
+
+  async function start() {
+    if (!checkedActive || !subjectId || !topicId || !beginAction()) return;
     setMessage("");
-    const result = await action();
-    if (result.status === "ok") {
-      const normalized = normalizeSession(result.data, session);
-      setSession({ ...normalized, resumedAt: normalized.status === "RUNNING" ? new Date().toISOString() : null });
-    }
-    else setMessage(result.message);
-    setIsBusy(false);
+    const selected = presets.find((p) => p.value === preset)!;
+    const result = await createSession({ subjectId, topicId, tipo: sessionType, preset, ...(blockId ? { blocoId: blockId } : {}), ...(reviewId ? { reviewId } : {}), ...("duration" in selected ? { duracaoAlvoMin: selected.duration } : {}) }, { subjectName, topicName, plannedDurationMin });
+    if (result.status === "ok") { setSession(result.data); setNow(Date.now()); }
+    else fail(result);
+    endAction();
+    if (result.status === "conflict" || result.status === "offline") void checkActive(true);
   }
 
-  async function handleLeaveSession() {
+  async function transition(action: "pause" | "resume") {
+    if (!session || !beginAction()) return false;
+    setMessage("");
+    const result = await (action === "pause" ? pauseSession(session.id, session) : resumeSession(session.id, session));
+    if (result.status === "ok") { setSession(result.data); setNow(Date.now()); }
+    else fail(result);
+    endAction();
+    if (result.status === "conflict" || result.status === "offline") void checkActive(true);
+    return result.status === "ok";
+  }
+
+  async function leave() {
+    if (!beginAction()) return;
     if (session?.status === "RUNNING") {
-      const paused = await pauseSession(session.id);
-      if (paused.status !== "ok") { setMessage(paused.message); return; }
+      const result = await pauseSession(session.id, session);
+      if (result.status !== "ok") { fail(result); endAction(); void checkActive(true); return; }
     }
+    endAction();
     router.push("/dashboard");
   }
 
-  async function handleFinish() {
-    if (!session || !assessment) return;
-    if (session.type === "REVISAO" && displayedSeconds < 5 * 60) {
-      setMessage("Complete pelo menos 5 minutos para registrar a revisão e atualizar o próximo intervalo.");
-      return;
-    }
-    if (session.type === "QUESTOES" && questionsDone && (!Number.isInteger(Number(questionsDone)) || Number(questionsDone) < 1 || Number(questionsDone) > 500 || Number(questionsCorrect || 0) < 0 || Number(questionsCorrect || 0) > Number(questionsDone))) {
-      setMessage("Informe de 1 a 500 questões e um número de acertos entre zero e o total feito.");
-      return;
-    }
-    setIsBusy(true);
-    setMessage("");
-    const result = await finishSession(session.id, assessment, note);
+  async function saveQuestions(completion: Completion) {
+    if (!completion.pending) return;
+    // Keep the finished result and form available if the separate write fails or this page reloads.
+    writeUserStorage("pending_questions", completion);
+    const result = await createQuestionLog(completion.pending);
     if (result.status === "ok") {
-      setFinished({ xp: result.data.xp.ganho, minutes: result.data.sessao.minutosTotais });
-      setSession(null);
-      if (session.type === "QUESTOES" && resolvedSubjectId && resolvedTopicId && Number(questionsDone) > 0) {
-        const log = await createQuestionLog({ subjectId: resolvedSubjectId, topicId: resolvedTopicId, feitas: Number(questionsDone), acertadas: Number(questionsCorrect || 0), sessionId: session.id });
-        if (log.status !== "ok") setMessage(`Sessão concluída, mas o registro de questões falhou: ${log.message}`);
-      }
+      // Question accuracy may move the review after finishSession has already returned its original date.
+      const latest = await fetchNextReview(completion.pending.topicId);
+      const updatedResult = latest.status === "ok" ? { ...completion.result, proximaRevisao: {
+        reviewId: latest.data?.reviewId ?? null, agendadaPara: latest.data?.agendadaPara ?? null, intervaloDias: null,
+      } } : completion.result;
+      setFinished({ ...completion, result: updatedResult, pending: undefined, questionsSaved: true, questionXp: result.data?.xpGanho ?? 0, reviewDateUnconfirmed: latest.status !== "ok" });
+      writeUserStorage("pending_questions", null);
+      setMessage("");
     } else {
-      setMessage(result.message);
+      setMessage(`Sessão registrada. As questões ainda não foram confirmadas: ${result.message}`);
     }
-    setIsBusy(false);
   }
 
-  if (isLoading) return <SessionState title="Carregando sessão" message="Verificando se existe uma sessão ativa." />;
+  async function finish() {
+    if (!session || !assessment || actionInFlight.current) return;
+    const validation = session.type === "QUESTOES" ? validateQuestionCounts(questionsDone, questionsCorrect) : null;
+    if (validation) { setMessage(validation); return; }
+    if (session.type === "QUESTOES" && questionsDone && (!session.subjectId || !session.topicId)) { setMessage("Não foi possível identificar o assunto da sessão recuperada. Apague os campos de questões para encerrar somente a sessão."); return; }
+    if (!beginAction()) return;
+    setMessage("");
+    if (session.type === "REVISAO") {
+      const latest = await getActiveSession();
+      if (latest.status !== "ok") { fail(latest); endAction(); return; }
+      if (latest.data?.id !== session.id) {
+        endAction(); await checkActive(true); setMessage("Esta sessão já mudou em outra aba ou aparelho. Confira seu progresso."); return;
+      }
+      setSession(latest.data); setNow(Date.now());
+      if (latest.data.minutosAcumulados < 5) {
+        setMessage(`O histórico contabilizou ${latest.data.minutosAcumulados} min. A revisão exige 5 minutos contabilizados; segundos parciais de cada pausa ainda são descartados pelo serviço.`);
+        endAction(); return;
+      }
+    }
+    const result = await finishSession(session.id, assessment, note);
+    if (result.status === "ok") {
+      const completion: Completion = { result: result.data, subjectName: activeSubject, topicName: activeTopic, questionXp: 0, displaySeconds: elapsedSessionSeconds(session),
+        ...(session.type === "QUESTOES" && Number(questionsDone) > 0 ? { pending: { subjectId: session.subjectId, topicId: session.topicId, feitas: Number(questionsDone), acertadas: Number(questionsCorrect || 0), sessionId: session.id } } : {}) };
+      setFinished(completion); setSession(null);
+      if (completion.pending) await saveQuestions(completion);
+    } else fail(result);
+    endAction();
+    if (result.status === "conflict" || result.status === "offline") void checkActive(true);
+  }
+
+  if (isLoading) return <Layout><p role="status">Verificando sua sessão...</p></Layout>;
 
   if (finished) {
-    return (
-      <SessionLayout>
-        <section className="space-y-7 pb-8">
-          <header className="flex items-center justify-between gap-4 border-b border-border pb-7">
-            <div className="flex items-center gap-3">
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent font-display text-3xl font-semibold text-white">S</span>
-              <span className="font-display text-3xl font-semibold tracking-tight">StudyQuest</span>
-            </div>
-            <span className="inline-flex min-h-12 items-center gap-2 rounded-full bg-accent-soft px-4 text-lg font-semibold text-accent"><Check aria-hidden="true" size={20} />+{finished.xp} XP</span>
-          </header>
-
-          <div>
-            <p className="text-xl text-muted">Sessão encerrada</p>
-            <h1 className="mt-3 font-display text-4xl font-semibold leading-tight">{subjectName} - {topicName}</h1>
-            <p className="mt-4 text-xl leading-8 text-muted">Você completou o bloco com foco e já ganhou recompensa.</p>
-            {message ? <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{message}</p> : null}
-          </div>
-
-          <article className="rounded-[2rem] border border-border bg-surface-muted p-7">
-            <p className="text-xl text-muted">Tempo estudado</p>
-            <div className="mt-5 flex flex-wrap items-end justify-between gap-5">
-              <p className="font-mono text-6xl font-semibold tabular-nums tracking-tight">{formatTimer(finished.minutes * 60)}</p>
-              <div className="text-right">
-                <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-3 text-lg font-semibold text-[#f21b52]"><Check aria-hidden="true" size={21} />+{finished.xp} XP</p>
-                <p className="mt-2 text-base text-muted">Recompensa liberada</p>
-              </div>
-            </div>
-            <p className="mt-6 text-lg text-muted">Bloco concluído com sucesso.</p>
-          </article>
-
-          <section>
-            <h2 className="font-display text-3xl font-semibold">Como foi?</h2>
-            <div className="mt-5 space-y-4">
-              {assessments.map((item) => (
-                <article key={item.value} className={`flex items-center justify-between gap-4 rounded-3xl border p-6 ${assessment === item.value ? "border-accent bg-accent-soft" : "border-border bg-surface"}`}>
-                  <div>
-                    <h3 className="font-display text-2xl font-semibold">{item.label === "Travei" ? "Travei" : item.label}</h3>
-                    <p className="mt-2 text-base text-muted">{item.value === "travei" ? "Difícil, precisou de esforço" : item.value === "ok" ? "Médio, foi aproveitoso" : "Fácil, explicaria para alguém"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-xl font-semibold ${item.value === "travei" ? "text-[#f21b52]" : "text-muted"}`}>{item.interval}</p>
-                    <p className="mt-1 text-sm text-muted">Próxima revisão</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2 className="font-display text-2xl font-semibold">Próximo bloco</h2>
-            <div className="mt-4 space-y-3">
-              <button type="button" onClick={() => router.push("/dashboard")} className="min-h-16 w-full rounded-full bg-accent px-5 py-3 text-xl font-semibold text-white">Continuar</button>
-              <button type="button" onClick={() => router.push("/dashboard")} className="min-h-16 w-full rounded-full border border-border bg-surface px-5 py-3 text-xl font-semibold text-foreground">Responder depois</button>
-            </div>
-          </section>
-        </section>
-      </SessionLayout>
-    );
+    const result = finished.result;
+    const short = result.sessao.minutosTotais < 5;
+    return <Layout><header className="flex items-center justify-between gap-3"><Link href="/dashboard" className="font-display text-2xl font-semibold">StudyQuest</Link><ThemeToggle /></header>
+      <h1 className="mt-8 font-display text-3xl font-semibold">Sessão registrada</h1><p className="mt-3 text-lg text-muted">{finished.subjectName} · {finished.topicName}</p>
+      <section className="mt-6 rounded-3xl border border-border bg-surface p-6"><p className="text-muted">Tempo estudado</p><p className="mt-2 font-mono text-5xl font-semibold">{formatTimer(result.sessao.minutosTotais * 60)}</p>{(finished.displaySeconds ?? 0) > result.sessao.minutosTotais * 60 ? <p className="mt-3 text-sm leading-6 text-muted">O relógio desta tela marcou {formatTimer(finished.displaySeconds!)}. O histórico registrou {result.sessao.minutosTotais} min, pois os segundos parciais de cada trecho ainda não são contabilizados.</p> : null}<p className="mt-4 text-xl font-semibold">+{result.xp.ganho + finished.questionXp} XP</p><p className="mt-2 text-sm text-muted">{result.xp.ganho} XP da sessão{finished.questionsSaved ? ` + ${finished.questionXp} XP das questões` : ""}</p><p className="mt-4 text-sm leading-6 text-muted">{short ? "Sessões com menos de 5 minutos ficam no histórico, mas não concedem XP de estudo, não avançam o bloco nem agendam revisão." : "Tempo e avaliação registrados. Seu progresso foi atualizado pelo sistema."}</p></section>
+      <section className="mt-6 rounded-3xl border border-border bg-surface p-6"><h2 className="font-semibold">Próxima revisão</h2><p className="mt-3 text-muted">{finished.reviewDateUnconfirmed ? "Questões salvas. Não foi possível atualizar a data da revisão agora; confira suas revisões na Home." : result.proximaRevisao.agendadaPara ? `${new Date(result.proximaRevisao.agendadaPara).toLocaleDateString("pt-BR")}${result.proximaRevisao.intervaloDias !== null ? ` · intervalo de ${result.proximaRevisao.intervaloDias} dias` : ""}` : "Nenhuma revisão pendente para este assunto."}</p><p className="mt-3 text-sm text-muted">Avaliação: {assessments.find((a) => a.value === assessment)?.label ?? "registrada"}</p></section>
+      {message ? <p role="alert" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{message}</p> : null}
+      {finished.pending ? <section className="mt-5 rounded-3xl border border-border bg-surface p-5"><h2 className="font-semibold">Questões pendentes de confirmação</h2><p className="mt-2 text-sm text-muted">{finished.pending.acertadas} de {finished.pending.feitas} acertos. Se houve perda de conexão, confira o desempenho antes de repetir para evitar um registro duplicado.</p><Link href="/dashboard/analytics" className="mt-3 inline-flex min-h-11 items-center font-semibold text-accent">Conferir desempenho</Link><button type="button" disabled={isBusy} onClick={async () => { if (!beginAction()) return; await saveQuestions(finished); endAction(); }} className="mt-3 min-h-12 w-full rounded-full bg-accent px-4 font-semibold text-white disabled:opacity-50">{isBusy ? "Salvando..." : "Tentar salvar questões novamente"}</button></section> : null}
+      {result.proximoBloco.materia ? <section className="mt-6"><h2 className="font-semibold">Próximo bloco</h2><p className="mt-2 text-muted">{result.proximoBloco.materia} · {result.proximoBloco.assunto} · {result.proximoBloco.duracaoMin} min</p></section> : null}
+      <Link href="/dashboard" className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-full border border-border px-5 font-semibold">Voltar à Home</Link>
+    </Layout>;
   }
 
   if (session) {
-    const targetMinutes = Number(session.duracaoAlvoMin);
-    const targetSeconds = (Number.isFinite(targetMinutes) && targetMinutes > 0 ? targetMinutes : 50) * 60;
-    const progress = Number.isFinite(displayedSeconds) ? Math.min(100, Math.max(0, Math.round((displayedSeconds / targetSeconds) * 100))) : 0;
-    const estimatedXp = Number.isFinite(displayedSeconds) ? Math.max(0, Math.floor(displayedSeconds / 60)) : 0;
-
-    return (
-      <SessionLayout>
-        <section className="min-h-[calc(100dvh-3rem)] space-y-6 pb-44">
-          {showRecovery ? <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-5"><section role="dialog" aria-modal="true" aria-labelledby="recovery-title" className="w-full max-w-md rounded-3xl border border-border bg-surface p-7"><p className="text-sm font-semibold uppercase tracking-[0.15em] text-accent">Sessão recuperada</p><h2 id="recovery-title" className="mt-2 font-display text-2xl font-semibold">Você já tem um bloco em andamento</h2><p className="mt-3 text-muted">Tempo acumulado: {formatTimer(displayedSeconds)} · XP estimado: {Math.floor(displayedSeconds / 60)}</p><div className="mt-6 grid gap-3"><button type="button" onClick={() => { if (session.status === "PAUSED") void handleTransition(() => resumeSession(session.id)); setShowRecovery(false); }} className="min-h-12 rounded-full bg-accent px-5 font-semibold text-white">Retomar sessão</button><button type="button" onClick={() => { setAssessment("ok"); setShowRecovery(false); }} className="min-h-12 rounded-full border border-border px-5 font-semibold">Encerrar e avaliar</button></div></section></div> : null}
-          <div className="flex items-start justify-between gap-4 border-b border-border pb-7">
-            <div>
-              <p className="text-xl text-muted">Em andamento</p>
-              <h1 className="mt-3 font-display text-3xl font-semibold leading-tight">{subjectName} - {topicName}</h1>
-            </div>
-            <div className="flex items-center gap-2"><ThemeToggle /><button type="button" onClick={() => void handleLeaveSession()} className="min-h-12 shrink-0 rounded-2xl border border-border bg-surface px-5 text-base font-semibold text-muted transition hover:border-accent hover:text-accent">Sair</button></div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {(["TEORIA", "QUESTOES", "REVISAO"] as SessionType[]).map((type) => (
-              <button key={type} type="button" onClick={() => setSessionType(type)} className={`min-h-16 rounded-3xl border px-2 text-base font-semibold ${sessionType === type ? "border-accent bg-accent text-white" : "border-border bg-surface text-foreground"}`}>
-                {type === "QUESTOES" ? "Questões" : type === "REVISAO" ? "Revisão" : "Teoria"}
-              </button>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <p className="font-mono text-7xl font-semibold tabular-nums tracking-tight">{formatTimer(displayedSeconds)}</p>
-            <p className="mt-5 text-xl text-muted">Restam de {session.duracaoAlvoMin ?? 50} min - pausa de 10 min depois</p>
-            <div className="mt-8 h-3 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} /></div>
-            <p className="mt-3 text-left text-base text-muted">{progress}% do bloco concluído</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {presets.map((item) => <button key={item.value} type="button" onClick={() => setPreset(item.value)} className={`min-h-16 rounded-3xl border px-2 text-base font-semibold ${session.preset === item.value ? "border-accent bg-accent-soft text-accent" : "border-border bg-surface text-foreground"}`}>{item.label.replace("_", "/")}</button>)}
-          </div>
-
-          <article className="rounded-[2rem] border border-border bg-surface-muted p-7">
-            <p className="text-base text-muted">XP nessa sessão</p>
-            <p className="mt-4 font-display text-5xl font-semibold">+{estimatedXp} XP</p>
-            <p className="mt-4 text-lg text-muted">1 XP por minuto focado</p>
-          </article>
-
-          <article className="rounded-[2rem] border border-border bg-surface p-6">
-            <h2 className="font-semibold">Comportamento da sessão</h2>
-            <p className="mt-3 text-base leading-7 text-muted">A tela escurece sozinha a cada 20 segundos. Sair da sessão pausa o cronômetro, mas não apaga o XP acumulado.</p>
-          </article>
-
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-page/95 px-5 pb-5 pt-4 backdrop-blur sm:px-6">
-            <div className="mx-auto flex w-full max-w-xl gap-3">
-              {session.status === "RUNNING" ? (
-                <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => pauseSession(session.id))} className="inline-flex min-h-16 flex-1 items-center justify-center gap-2 rounded-full bg-[#f21b52] px-4 py-3 text-xl font-semibold text-white disabled:opacity-50"><Pause aria-hidden="true" size={20} />Pausar</button>
-              ) : (
-                <button type="button" disabled={isBusy} onClick={() => void handleTransition(() => resumeSession(session.id))} className="inline-flex min-h-16 flex-1 items-center justify-center gap-2 rounded-full bg-accent px-4 py-3 text-xl font-semibold text-white disabled:opacity-50"><Play aria-hidden="true" size={20} />Retomar</button>
-              )}
-              <button type="button" disabled={isBusy} onClick={() => setAssessment(assessment ?? "ok")} className="inline-flex min-h-16 flex-1 items-center justify-center gap-2 rounded-full bg-surface-muted px-4 py-3 text-xl font-semibold text-foreground disabled:opacity-50"><Square aria-hidden="true" size={20} />Encerrar sessão</button>
-            </div>
-          </div>
-          {assessment ? (
-            <div className="space-y-3 rounded-3xl border border-border bg-surface p-5">
-              <h2 className="font-display text-2xl font-semibold">Como foi?</h2>
-              <div className="grid gap-2">
-                {assessments.map((item) => (
-                  <button key={item.value} type="button" onClick={() => setAssessment(item.value)} className={`flex min-h-12 items-center justify-between rounded-2xl border px-4 text-left ${assessment === item.value ? "border-accent bg-accent-soft" : "border-border"}`}>
-                    <span className="font-semibold">{item.label}</span><span className="text-muted">{item.interval}</span>
-                  </button>
-                ))}
-              </div>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nota opcional" rows={3} className="w-full rounded-2xl border border-border bg-surface-muted px-4 py-3 text-foreground outline-none" />
-              {session.type === "QUESTOES" ? <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border p-4"><label className="text-sm font-semibold text-muted">Questões feitas<input type="number" min="1" max="500" value={questionsDone} onChange={(event) => setQuestionsDone(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-surface-muted px-3 text-foreground" /></label><label className="text-sm font-semibold text-muted">Acertos<input type="number" min="0" max={questionsDone || 500} value={questionsCorrect} onChange={(event) => setQuestionsCorrect(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border bg-surface-muted px-3 text-foreground" /></label><p className="col-span-2 text-sm text-muted">O percentual será calculado e salvo no seu desempenho. Deixe em branco se não quiser registrar agora.</p></div> : null}
-              <button type="button" disabled={isBusy} onClick={() => void handleFinish()} className="min-h-12 w-full rounded-full bg-accent px-5 py-3 font-semibold text-white disabled:opacity-50">Confirmar encerramento</button>
-            </div>
-          ) : null}
-          {message ? <p className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">{message}</p> : null}
-        </section>
-      </SessionLayout>
-    );
+    const target = session.duracaoAlvoMin ?? session.plannedDurationMin;
+    const progress = target ? Math.min(100, Math.floor(seconds / (target * 60) * 100)) : 0;
+    return <Layout><header className="flex items-center justify-between gap-3"><Link href="/dashboard" onClick={(e) => { e.preventDefault(); void leave(); }} className="font-semibold">Voltar à Home</Link><ThemeToggle /></header>
+      <p className="mt-7 text-sm font-semibold uppercase tracking-widest text-accent">{session.status === "PAUSED" ? "Sessão pausada" : "Em andamento"}</p><h1 className="mt-3 font-display text-3xl font-semibold">{activeSubject}</h1><p className="mt-2 text-lg text-muted">{activeTopic}</p>
+      {showRecovery ? <section role="dialog" aria-modal="true" aria-labelledby="recovery-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"><div className="w-full max-w-md rounded-3xl border border-border bg-surface p-6"><h2 id="recovery-title" className="font-display text-2xl font-semibold">Sessão recuperada</h2><p className="mt-3 text-muted">{activeSubject} · {formatTimer(seconds)} acumulados nesta tela.</p>{message ? <p role="alert" className="mt-3 text-sm text-amber-700">{message}</p> : null}<button type="button" disabled={isBusy} onClick={async () => { if (session.status !== "PAUSED" || await transition("resume")) setShowRecovery(false); }} className="mt-5 min-h-12 w-full rounded-full bg-accent px-4 font-semibold text-white">Retomar sessão</button><button type="button" disabled={isBusy} onClick={() => { setShowRecovery(false); setAssessment("ok"); }} className="mt-3 min-h-12 w-full rounded-full border border-border px-4 font-semibold">Encerrar e avaliar</button></div></section> : null}
+      <div className="mt-6 grid grid-cols-3 gap-2">{(["TEORIA", "QUESTOES", "REVISAO"] as SessionType[]).map((type) => <button key={type} type="button" disabled aria-pressed={session.type === type} className={`min-h-12 rounded-2xl border px-2 text-sm font-semibold ${session.type === type ? "border-accent bg-accent-soft text-accent" : "border-border text-muted opacity-60"}`}>{typeLabel(type)}</button>)}</div>
+      <section className="mt-7 text-center"><p role="timer" aria-label="Tempo de estudo" className="font-mono text-6xl font-semibold tabular-nums">{formatTimer(seconds)}</p><p className="mt-4 text-muted">{session.preset === "LIVRE" ? target ? `Bloco planejado de ${target} min · pausas manuais` : "Tempo livre" : `Alvo de ${target} min · pausa sugerida de ${session.preset === "P25_5" ? 5 : 10} min`}</p>{target ? <><progress aria-label="Progresso da sessão" value={progress} max={100} className="mt-5 h-3 w-full accent-[#974fc9]" /><p className="mt-2 text-sm text-muted">{progress}% do alvo</p></> : null}</section>
+      <p className="mt-4 rounded-2xl bg-surface-muted p-4 text-sm leading-6 text-muted">Última confirmação do histórico: {session.minutosAcumulados} min. O relógio desta tela mantém os segundos, mas o histórico ainda descarta a parte incompleta de cada minuto ao pausar.</p>
+      <p className="mt-5 text-sm leading-6 text-muted">Tipo e preset são definidos ao iniciar. O XP é calculado ao encerrar, conforme seu tempo acumulado no dia. Sessões com menos de 5 minutos não concedem XP de estudo.</p>
+      {!session.subjectId || !session.topicId ? <p className="mt-4 rounded-2xl bg-surface-muted p-4 text-sm text-muted">O assunto desta sessão não está disponível neste aparelho. Você pode retomar ou encerrar o estudo; o registro de questões exige os dados do aparelho onde ela começou.</p> : null}
+      <div className="mt-6 flex gap-3"><button type="button" disabled={isBusy} onClick={() => void transition(session.status === "RUNNING" ? "pause" : "resume")} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-full bg-accent px-4 font-semibold text-white disabled:opacity-50">{session.status === "RUNNING" ? <><Pause size={18} />Pausar</> : <><Play size={18} />Retomar</>}</button><button type="button" disabled={isBusy} onClick={() => setAssessment("ok")} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 font-semibold"><Square size={18} />Encerrar sessão</button></div>
+      {assessment ? <div ref={assessmentRef} className="mt-6 space-y-4 rounded-3xl border border-border bg-surface p-5"><h2 className="font-display text-2xl font-semibold">Como foi?</h2><div className="flex gap-2">{assessments.map((a) => <button key={a.value} type="button" disabled={isBusy} aria-pressed={assessment === a.value} onClick={() => setAssessment(a.value)} className={`min-h-12 flex-1 rounded-2xl border text-sm font-semibold ${assessment === a.value ? "border-accent bg-accent-soft text-accent" : "border-border"}`}>{a.label}</button>)}</div><p className="text-xs text-muted">A data da próxima revisão será confirmada ao salvar sua avaliação.</p><label className="block text-sm font-semibold">Nota opcional<textarea disabled={isBusy} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="mt-2 w-full rounded-2xl border border-border bg-surface-muted p-3" /></label>
+        {session.type === "QUESTOES" && session.subjectId && session.topicId ? <div className="grid grid-cols-2 gap-3"><label className="text-sm font-semibold">Questões feitas<input disabled={isBusy} type="number" min={1} max={500} step={1} value={questionsDone} onChange={(e) => setQuestionsDone(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-surface-muted px-3" /></label><label className="text-sm font-semibold">Acertos<input disabled={isBusy} type="number" min={0} max={questionsDone || 500} step={1} value={questionsCorrect} onChange={(e) => setQuestionsCorrect(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-surface-muted px-3" /></label><p className="col-span-2 text-xs text-muted">Registro opcional. Deixe ambos em branco para salvar somente a sessão.</p></div> : null}
+        <button type="button" disabled={isBusy} onClick={() => void finish()} className="min-h-12 w-full rounded-full bg-accent px-5 font-semibold text-white disabled:opacity-50">{isBusy ? "Salvando..." : "Confirmar encerramento"}</button><button type="button" disabled={isBusy} onClick={() => setAssessment(null)} className="min-h-11 w-full font-semibold text-muted">{session.status === "PAUSED" ? "Voltar ao cronômetro" : "Continuar estudando"}</button></div> : null}
+      {message && !showRecovery ? <p role="alert" className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{message}</p> : null}
+    </Layout>;
   }
 
-  return (
-    <SessionLayout>
-      <section className="space-y-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">Nova sessão</p>
-          <h1 className="mt-2 font-display text-4xl font-semibold">Foco no próximo bloco.</h1>
-          <p className="mt-2 text-muted">O tempo e o XP serão calculados pelo servidor.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {(["TEORIA", "QUESTOES", "REVISAO"] as SessionType[]).map((type) => (
-            <button key={type} type="button" onClick={() => setSessionType(type)} className={`min-h-12 rounded-2xl border px-2 text-sm font-semibold ${sessionType === type ? "border-accent bg-accent-soft text-accent" : "border-border text-muted"}`}>{type === "QUESTOES" ? "Questões" : type[0] + type.slice(1).toLowerCase()}</button>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {presets.map((item) => <button key={item.value} type="button" onClick={() => setPreset(item.value)} className={`min-h-12 rounded-2xl border px-2 text-sm font-semibold ${preset === item.value ? "border-accent bg-accent-soft text-accent" : "border-border text-muted"}`}>{item.label}</button>)}
-        </div>
-        {message ? <p className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">{message}</p> : null}
-        <button type="button" disabled={isBusy} onClick={() => void handleStart()} className="min-h-12 w-full rounded-full bg-accent px-5 py-3 font-semibold text-white disabled:opacity-50">{isBusy ? "Iniciando..." : "Começar sessão"}</button>
-      </section>
-    </SessionLayout>
-  );
+  return <Layout><header className="flex items-center justify-between"><Link href="/dashboard" className="font-semibold">Voltar à Home</Link><ThemeToggle /></header><h1 className="mt-8 font-display text-3xl font-semibold">Preparar sessão</h1><p className="mt-3 text-muted">{subjectName} · {topicName}</p>{plannedDurationMin ? <p className="mt-2 text-sm text-muted">Bloco planejado: {plannedDurationMin} min. Escolha outro preset abaixo se quiser ajustar o foco desta sessão.</p> : null}
+    <div className="mt-6 grid grid-cols-3 gap-2">{(["TEORIA", "QUESTOES", "REVISAO"] as SessionType[]).map((type) => <button key={type} type="button" disabled={isBusy || Boolean(reviewId && type !== "REVISAO")} aria-pressed={sessionType === type} onClick={() => setSessionType(type)} className={`min-h-12 rounded-2xl border px-2 text-sm font-semibold disabled:opacity-50 ${sessionType === type ? "border-accent bg-accent-soft text-accent" : "border-border"}`}>{typeLabel(type)}</button>)}</div>
+    <div className="mt-4 grid grid-cols-3 gap-2">{presets.map((p) => <button key={p.value} type="button" disabled={isBusy} aria-pressed={preset === p.value} onClick={() => { presetChosen.current = true; setPreset(p.value); }} className={`min-h-12 rounded-2xl border text-sm font-semibold ${preset === p.value ? "border-accent bg-accent-soft text-accent" : "border-border"}`}>{p.label}</button>)}</div>
+    {message ? <p role="alert" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{message}</p> : null}
+    {!checkedActive ? <button type="button" onClick={() => void checkActive()} className="mt-5 min-h-12 w-full rounded-full border border-border font-semibold">Verificar sessão ativa novamente</button> : null}
+    <button type="button" disabled={isBusy || !checkedActive || !subjectId || !topicId} onClick={() => void start()} className="mt-6 min-h-14 w-full rounded-full bg-accent px-5 font-semibold text-white disabled:opacity-50">{isBusy ? "Iniciando..." : "Começar sessão"}</button>
+    {(!subjectId || !topicId) && !blockId ? <Link href="/cycle" className="mt-4 inline-flex min-h-12 w-full items-center justify-center font-semibold text-accent">Escolher um bloco no ciclo</Link> : null}
+  </Layout>;
 }
 
-function SessionLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="min-h-screen bg-page px-4 py-6 text-foreground sm:px-6 sm:py-10">
-      <div className="mx-auto w-full max-w-xl">{children}</div>
-    </main>
-  );
-}
-
-function SessionState({ title, message }: { title: string; message: string }) {
-  return <SessionLayout><div className="rounded-3xl bg-surface-muted p-6 text-center"><h1 className="font-display text-2xl font-semibold">{title}</h1><p className="mt-2 text-muted">{message}</p></div></SessionLayout>;
-}
-
-export default function SessionPage() {
-  return <Suspense fallback={<SessionState title="Carregando sessão" message="Preparando o cronômetro." />}><SessionPageContent /></Suspense>;
-}
-
-function formatTimer(totalSeconds: number) {
-  const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
-  return [Math.floor(safeSeconds / 60), safeSeconds % 60]
-    .map((value) => String(value).padStart(2, "0"))
-    .join(":");
-}
+function Layout({ children }: { children: React.ReactNode }) { return <main className="min-h-screen bg-page px-5 py-7 text-foreground"><div className="mx-auto w-full max-w-xl pb-10">{children}</div></main>; }
+function formatTimer(seconds: number) { const safe = Math.max(0, Math.floor(seconds)); return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`; }
+export default function SessionPage() { return <Suspense fallback={<Layout><p role="status">Preparando sessão...</p></Layout>}><SessionPageContent /></Suspense>; }

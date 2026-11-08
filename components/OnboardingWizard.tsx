@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, LoaderCircle, Minus, Plus } from "lucide-react";
 import { OnboardingError, OnboardingLoading, OnboardingShell } from "@/components/OnboardingShell";
-import { fetchGoalWeights, fetchGoals, saveAvailability, saveDifficulties, saveOnboardingGoal, type AvailabilityDay, type Goal, type GoalWeight } from "@/lib/services/onboarding-client";
+import { DIFFICULTY_LABELS, fetchGoalWeights, fetchGoals, saveAvailability, saveDifficulties, saveOnboardingGoal, type AvailabilityDay, type Goal, type GoalWeight } from "@/lib/services/onboarding-client";
+import { userStorageKey } from "@/lib/user-storage";
 import { generateCycle, type CurrentCycle } from "@/lib/services/cycle-client";
 
 type Draft = {
@@ -16,9 +17,10 @@ type Draft = {
   cycle?: CurrentCycle;
 };
 
-const DRAFT_KEY = "studyquest_onboarding_draft";
+const DRAFT_KEY = "onboarding_draft_v2";
+function draftStorageKey() { return userStorageKey(DRAFT_KEY) ?? DRAFT_KEY; }
 const DAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const LEVELS = ["Bem insegura", "Insegura", "Mais ou menos", "Quase domino", "Domino"];
+const LEVELS = DIFFICULTY_LABELS;
 
 function courseName(goal: Goal) {
   return goal.nome.split(" · ")[0].trim();
@@ -51,7 +53,7 @@ export function OnboardingWizard() {
     let active = true;
     let savedDraft: Draft = {};
     try {
-      const saved = sessionStorage.getItem(DRAFT_KEY);
+      const saved = sessionStorage.getItem(draftStorageKey());
       if (saved) {
         savedDraft = JSON.parse(saved) as Draft;
         if (savedDraft.step && savedDraft.step >= 1 && savedDraft.step <= 6) setStep(savedDraft.step);
@@ -66,7 +68,7 @@ export function OnboardingWizard() {
         setStep(requestedStep > 1 && !savedDraft.goalId ? 1 : requestedStep);
       }
     } catch {
-      sessionStorage.removeItem(DRAFT_KEY);
+      sessionStorage.removeItem(draftStorageKey());
     }
     void fetchGoals().then((result) => {
       if (!active) return;
@@ -91,7 +93,7 @@ export function OnboardingWizard() {
   useEffect(() => {
     if (isLoading) return;
     const draft: Draft = { step, course, goalId, availability, levels, cycle: cycle ?? undefined };
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* O fluxo continua sem rascunho local. */ }
+    try { sessionStorage.setItem(draftStorageKey(), JSON.stringify(draft)); } catch { /* O fluxo continua sem rascunho local. */ }
   }, [step, course, goalId, availability, levels, cycle, isLoading]);
 
   async function continueToWeights() {
@@ -234,11 +236,11 @@ export function OnboardingWizard() {
       </> : null}
 
       {step === 5 ? <>
-        <p className="mb-4 rounded-2xl bg-surface-muted p-4 text-sm leading-6 text-muted">1 = bem insegura · 5 = domino e explicaria para alguém.</p>
+        <p className="mb-4 rounded-2xl bg-surface-muted p-4 text-sm leading-6 text-muted">1 = domino o assunto · 5 = tenho muita dificuldade e preciso de mais tempo.</p>
         <div className="space-y-3">{subjects.map((subject) => <div key={subject.id} className="rounded-2xl border border-border bg-surface p-4">
           <div className="flex items-start justify-between gap-3"><div><h2 className="font-display text-lg font-bold">{subject.nome}</h2><p className="text-sm text-muted">{subject.area}</p></div><span className="rounded-full bg-accent-soft px-3 py-1.5 text-sm font-bold text-accent">{levels[subject.id] ?? 3}/5</span></div>
-          <input aria-label={`Nível em ${subject.nome}`} type="range" min={1} max={5} step={1} value={levels[subject.id] ?? 3} onChange={(event) => setLevels((current) => ({ ...current, [subject.id]: Number(event.target.value) }))} className="mt-4 w-full accent-[#974fc9]" />
-          <div className="flex justify-between gap-2 text-[11px] text-muted"><span>Bem insegura</span><span>{LEVELS[(levels[subject.id] ?? 3) - 1]}</span><span>Domino</span></div>
+          <input aria-label={`Dificuldade em ${subject.nome}`} type="range" min={1} max={5} step={1} value={levels[subject.id] ?? 3} onChange={(event) => setLevels((current) => ({ ...current, [subject.id]: Number(event.target.value) }))} className="mt-4 w-full accent-[#974fc9]" />
+          <div className="flex justify-between gap-2 text-[11px] text-muted"><span>Domino</span><span>{LEVELS[(levels[subject.id] ?? 3) - 1]}</span><span>Preciso reforçar</span></div>
         </div>)}</div>
         <OnboardingError message={error} />
         <button type="button" disabled={isSaving || !subjects.length} onClick={() => void finishDifficulties()} className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-5 text-lg font-bold text-white disabled:opacity-40">{isSaving ? <><LoaderCircle size={19} className="animate-spin" /> Montando seu ciclo...</> : <>Gerar meu ciclo <ArrowRight size={19} /></>}</button>
@@ -252,7 +254,7 @@ export function OnboardingWizard() {
           <ol className="mt-5 space-y-3">{cycle?.blocos.slice(1, 6).map((block, index) => <li key={block.id} className="flex items-center justify-between gap-3 border-b border-border pb-3 text-sm"><span><span className="mr-3 text-muted">{index + 2}</span>{block.materia} · {block.assunto ?? "Assunto"}</span><span className="shrink-0 text-muted">{block.duracaoMin} min</span></li>)}</ol>
           <p className="mt-5 text-sm text-muted">Você pode iniciar agora e ajustar seu ciclo mais tarde.</p>
         </div>
-        <button type="button" onClick={() => { sessionStorage.removeItem(DRAFT_KEY); router.push("/dashboard"); }} className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-5 text-lg font-bold text-white">Começar agora <ArrowRight size={19} /></button>
+        <button type="button" onClick={() => { sessionStorage.removeItem(draftStorageKey()); router.push("/dashboard"); }} className="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-accent px-5 text-lg font-bold text-white">Começar agora <ArrowRight size={19} /></button>
       </> : null}
     </OnboardingShell>
   );

@@ -14,7 +14,7 @@ export function OfflineStatus() {
       void getOfflineCounts().then(({ pending: nextPending, conflicts: nextConflicts }) => {
         setPending(nextPending);
         setConflicts(nextConflicts);
-      });
+      }).catch(() => { /* Connectivity notice works even when IndexedDB is unavailable. */ });
     };
 
     update();
@@ -32,13 +32,13 @@ export function OfflineStatus() {
   if (isOnline && pending === 0 && conflicts === 0) return null;
 
   const message = !isOnline
-    ? "Sem conexao. O cronometro continua funcionando e as alteracoes ficam salvas neste aparelho."
+    ? "Sem conexão. O cronômetro continua na tela. Confira a sessão e tente salvar novamente quando a conexão voltar."
     : conflicts > 0
       ? `${conflicts} conflito${conflicts > 1 ? "s" : ""} aguardando revisao.`
-      : `Sincronizando ${pending} alteracao${pending > 1 ? "es" : ""}...`;
+      : `${pending} alteração${pending > 1 ? "es" : ""} pendente${pending > 1 ? "s" : ""}. Confira seus dados após a conexão voltar.`;
 
   return (
-    <div className="fixed inset-x-3 bottom-20 z-50 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-foreground shadow-lg lg:bottom-4 lg:left-auto lg:max-w-sm">
+    <div role="status" className="fixed inset-x-3 bottom-24 z-50 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-foreground shadow-lg lg:left-auto lg:max-w-sm">
       <p className="font-semibold">{isOnline ? "Sincronizacao" : "Modo offline"}</p>
       <p className="mt-1 text-muted">{message}</p>
     </div>
