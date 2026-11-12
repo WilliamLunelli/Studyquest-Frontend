@@ -38,8 +38,8 @@ export async function POST(request: Request) {
       password?: string;
     };
 
-    const email = body.email?.trim().toLowerCase();
-    const password = body.password?.trim();
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body.password === "string" ? body.password : "";
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email ou senha incorretos" }, { status: 400 });

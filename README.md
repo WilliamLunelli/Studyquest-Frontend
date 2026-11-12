@@ -27,14 +27,14 @@ npm run build
 npm start
 ```
 
-Os testes usam o executor nativo do Node e remoção de tipos TypeScript (`--experimental-strip-types`); utilize Node 22.18 ou superior para esse comando. O build utiliza Google Fonts e requer acesso de rede para buscar as fontes.
+Os testes usam o executor nativo do Node e o compilador TypeScript já instalado nas dependências de desenvolvimento; utilize Node 22.18 ou superior. Eles verificam o cronômetro, a validação de questões, a preservação de senhas, o cache e os avisos offline legados. O build utiliza Google Fonts e requer acesso de rede para buscar as fontes.
 
 ## Percurso do usuário
 
 1. Criar conta ou entrar.
 2. Configurar objetivo, instituição, pesos, disponibilidade e dificuldades no onboarding.
 3. Gerar o ciclo e iniciar um bloco pela Home ou pela página de ciclo.
-4. Pausar, retomar, recuperar e encerrar a sessão com autoavaliação.
+4. Pausar, retomar, recuperar e encerrar a sessão com autoavaliação. Abrir a avaliação pausa o cronômetro; retomar exige cancelar a avaliação. Após a confirmação, a sessão permanece encerrada.
 5. Registrar opcionalmente questões e consultar o desempenho.
 6. Abrir revisões, realizar a recuperação ativa e iniciar uma sessão de revisão.
 7. Ajustar preferências, atualizar o ciclo quando desejado ou sair da conta.
@@ -48,7 +48,7 @@ Sessões de menos de cinco minutos ficam no histórico, mas a API não concede X
 - `lib/services/`: clientes HTTP e contratos da API.
 - `lib/frontend/session.ts`: normalização temporal e validação das questões.
 - `lib/user-storage.ts`: estado local separado por usuário.
-- `scripts/frontend-regressions.test.mjs`: regressões do cronômetro e da validação de questões.
+- `scripts/`: testes de regressão do cronômetro, autenticação, cache e avisos offline.
 
 As rotas `/api/...` do Next.js encaminham autenticação, configurações, ciclo, Home, desempenho, revisões e questões à API. O dashboard agrega dados do usuário e de desempenho, preservando falhas do backend. `/api/me` consulta a conta atual. O detalhe de revisão é complementado com os IDs presentes nas listas de revisões de hoje e dos próximos 60 dias, sem depender do ciclo atual. A lista `/api/reviews` também permite atualizar a data exibida após as questões, quando o desempenho antecipa uma revisão.
 
@@ -68,6 +68,12 @@ Existe uma pendência de contabilização no backend: cada pausa descarta a part
 - Não há fluxo de recuperação de senha nem listagem completa de assuntos dominados. A interface informa os limites.
 - A API não oferece chave de idempotência para questões. Após uma perda de conexão com resultado incerto, confira o desempenho antes de repetir o registro.
 
-O service worker mantém o carregamento básico em cache. Novas gravações não são enfileiradas offline nem apresentadas como salvas sem confirmação do servidor. A fila legada pode concluir pedidos pendentes da versão anterior.
+O service worker mantém o carregamento básico em cache. Falhas de armazenamento não substituem uma resposta válida da rede por erro offline. Novas gravações não são enfileiradas offline nem apresentadas como salvas sem confirmação do servidor.
+
+Pedidos e conflitos das versões antigas são convertidos em avisos locais para conferência e descarte. Não há reenvio automático desses pedidos, pois o resultado anterior pode ser incerto e o token pode estar expirado. Ao ler os registros antigos, o frontend remove credenciais e corpos de requisição armazenados e mantém somente os metadados do aviso. Descartar um aviso não altera dados da conta no servidor.
+
+A fonte monoespaçada do cronômetro é carregada somente na rota de sessão. O frontend não utiliza banco local nem autenticação por cookie; esses módulos e as dependências antigas de SQLite e bcrypt foram removidos. O tempo de validade do JWT continua sendo definido pelo backend, sem variável de timeout no frontend.
+
+O manifest mantém nome, cores e URL inicial, sem ícones de livro. Os PNGs e o SVG antigos foram removidos; o favicon é vazio e embutido, sem uma requisição a arquivo externo. A versão atual do service worker elimina os caches antigos do StudyQuest ao ativar.
 
 Os documentos de auditoria e de correções na pasta de documentação registram o escopo acadêmico, as verificações e as pendências do backend.

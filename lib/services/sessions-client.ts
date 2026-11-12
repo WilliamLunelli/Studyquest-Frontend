@@ -1,5 +1,5 @@
 import { API_CONFIG, buildApiUrl, getAuthHeader } from "@/lib/api-config";
-import { normalizeSession, type ActiveSession, type SessionContext, type SessionPayload, type SessionPreset, type SessionType, type SelfAssessment } from "@/lib/frontend/session";
+import { isActiveSession, normalizeSession, type ActiveSession, type SessionContext, type SessionPayload, type SessionPreset, type SessionType, type SelfAssessment } from "@/lib/frontend/session";
 import { readUserStorage, writeUserStorage } from "@/lib/user-storage";
 
 export { normalizeSession } from "@/lib/frontend/session";
@@ -19,6 +19,9 @@ export type FinishedSession = {
 export type SessionClientError = { status: "unauthorized" | "conflict" | "error" | "offline"; message: string };
 export type SessionResult<T> = { status: "ok"; data: T } | SessionClientError;
 let mutationRevision = 0;
+const finishedSessions = new Set<string>();
+
+const finishedSessionError: SessionClientError = { status: "conflict", message: "Esta sessão já foi encerrada. Confira seu progresso na Home." };
 
 async function readError(response: Response) {
   const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
@@ -55,6 +58,8 @@ export async function getActiveSession(): Promise<SessionResult<ActiveSession | 
     const response = await fetch(buildApiUrl(API_CONFIG.endpoints.activeSession), { headers: getAuthHeader(), cache: "no-store" });
     if (response.status === 204) {
       if (revision === mutationRevision) {
+        const previous = readUserStorage<ActiveSession>("active_session_clock");
+        if (previous?.id) finishedSessions.add(previous.id);
         writeUserStorage("active_session_context", null);
         writeUserStorage("active_session_clock", null);
       }
@@ -70,33 +75,56 @@ export async function getActiveSession(): Promise<SessionResult<ActiveSession | 
     // A status changed elsewhere has no precise local timestamp. Only retain seconds for a matching snapshot.
     const matchingClock = clock && clock.id === raw.id && clock.status === raw.status ? clock : undefined;
     const data = normalizeSession(payload, { ...context, ...matchingClock });
+    if (!isActiveSession(data) || finishedSessions.has(data.id)) {
+      if (revision === mutationRevision) {
+        writeUserStorage("active_session_context", null);
+        writeUserStorage("active_session_clock", null);
+      }
+      return { status: "ok", data: null };
+    }
     if (revision === mutationRevision) writeUserStorage("active_session_clock", data);
     return { status: "ok", data };
   } catch { return { status: "offline", message: "Não foi possível verificar a sessão ativa. Tente novamente quando houver conexão." }; }
 }
 
 export async function pauseSession(id: string, current?: ActiveSession): Promise<SessionResult<ActiveSession>> {
+  if (finishedSessions.has(id) || (current && !isActiveSession(current))) return finishedSessionError;
+  if (current && (current.id !== id || current.status !== "RUNNING")) return { status: "conflict", message: "Confira a sessão ativa antes de pausar." };
   mutationRevision++;
   const result = await request<SessionPayload>(buildApiUrl(`${API_CONFIG.endpoints.sessions}/${id}/pause`), { method: "PATCH" });
   if (result.status !== "ok") return result;
+  if (finishedSessions.has(id)) return finishedSessionError;
   const data = normalizeSession(result.data, current ?? readUserStorage<ActiveSession>("active_session_clock") ?? undefined);
+  if (data.id !== id || data.status !== "PAUSED") return { status: "conflict", message: "Não foi possível confirmar a pausa. Confira a sessão ativa." };
   writeUserStorage("active_session_clock", data);
   return { status: "ok", data };
 }
+
+export async function prepareSessionAssessment(current: ActiveSession): Promise<SessionResult<ActiveSession>> {
+  if (finishedSessions.has(current.id) || !isActiveSession(current)) return finishedSessionError;
+  return current.status === "PAUSED" ? { status: "ok", data: current } : pauseSession(current.id, current);
+}
+
 export async function resumeSession(id: string, current?: ActiveSession): Promise<SessionResult<ActiveSession>> {
+  if (finishedSessions.has(id) || (current && !isActiveSession(current))) return finishedSessionError;
+  if (current && (current.id !== id || current.status !== "PAUSED")) return { status: "conflict", message: "Confira a sessão ativa antes de retomar." };
   mutationRevision++;
   const result = await request<SessionPayload>(buildApiUrl(`${API_CONFIG.endpoints.sessions}/${id}/resume`), { method: "PATCH" });
   if (result.status !== "ok") return result;
+  if (finishedSessions.has(id)) return finishedSessionError;
   const data = normalizeSession(result.data, current ?? readUserStorage<ActiveSession>("active_session_clock") ?? undefined);
+  if (data.id !== id || data.status !== "RUNNING") return { status: "conflict", message: "Não foi possível confirmar a retomada. Confira a sessão ativa." };
   writeUserStorage("active_session_clock", data);
   return { status: "ok", data };
 }
 export async function finishSession(id: string, autoavaliacao: SelfAssessment, nota?: string) {
+  if (finishedSessions.has(id)) return finishedSessionError;
   mutationRevision++;
   const result = await request<FinishedSession>(buildApiUrl(`${API_CONFIG.endpoints.sessions}/${id}/finish`), {
     method: "POST", body: JSON.stringify({ autoavaliacao, ...(nota?.trim() ? { nota: nota.trim() } : {}) }),
   });
   if (result.status === "ok") {
+    finishedSessions.add(id);
     writeUserStorage("active_session_context", null);
     writeUserStorage("active_session_clock", null);
   }

@@ -33,6 +33,10 @@ export type SessionPayload = Partial<ActiveSession> & {
   sessao?: Partial<ActiveSession> & { tipo?: SessionType };
 };
 
+export function isActiveSession(session: ActiveSession | null | undefined): session is ActiveSession {
+  return session?.status === "RUNNING" || session?.status === "PAUSED";
+}
+
 export function presetForBlockDuration(minutes: number): SessionPreset {
   return minutes === 25 ? "P25_5" : minutes === 50 ? "P50_10" : "LIVRE";
 }

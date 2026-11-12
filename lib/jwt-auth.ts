@@ -19,15 +19,6 @@ export interface AuthResponse {
 }
 
 /**
- * Check if token exists and is not expired
- */
-export function isAuthenticated(): boolean {
-  if (typeof window === "undefined") return false;
-  const token = localStorage.getItem(API_CONFIG.tokenKey);
-  return !!token;
-}
-
-/**
  * Get current stored user
  */
 export function getCurrentUser(): User | null {
@@ -57,32 +48,4 @@ export function clearAuth(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(API_CONFIG.tokenKey);
   localStorage.removeItem(API_CONFIG.userKey);
-}
-
-/**
- * Decode JWT payload (without verification)
- * Only for reading claims, not for security validation
- */
-export function decodeToken(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    
-    const payload = parts[1];
-    const decoded = Buffer.from(payload, "base64").toString("utf-8");
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check if JWT token is expired
- */
-export function isTokenExpired(token: string): boolean {
-  const payload = decodeToken(token);
-  if (!payload || !payload.exp) return false;
-  
-  const expiresAt = (payload.exp as number) * 1000;
-  return Date.now() >= expiresAt;
 }

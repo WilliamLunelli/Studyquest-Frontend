@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { OfflineStatus } from "@/components/OfflineStatus";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
@@ -20,16 +20,11 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-ibm-plex-mono",
-});
-
 export const metadata: Metadata = {
   title: "StudyQuest | Aprenda com constância",
-  description: "Landing page da StudyQuest com foco, progresso e uma rotina de estudo mais leve.",
+  description: "Planeje seu ciclo de estudos, acompanhe seu progresso e revise com constância no StudyQuest.",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "data:," },
 };
 
 export default function RootLayout({
@@ -38,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
+    <html lang="pt-BR" suppressHydrationWarning className={spaceGrotesk.variable}>
       <head>
         <Script id="studyquest-theme" strategy="beforeInteractive">
           {themeInitializer}

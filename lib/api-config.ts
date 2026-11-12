@@ -54,23 +54,6 @@ export function getStoredToken(): string | null {
 }
 
 /**
- * Store JWT token in localStorage
- */
-export function storeToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(API_CONFIG.tokenKey, token);
-}
-
-/**
- * Remove JWT token from localStorage
- */
-export function clearToken(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(API_CONFIG.tokenKey);
-  localStorage.removeItem(API_CONFIG.userKey);
-}
-
-/**
  * Get Authorization header with JWT token
  */
 export function getAuthHeader(): { Authorization: string } | {} {
